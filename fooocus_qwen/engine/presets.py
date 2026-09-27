@@ -37,9 +37,15 @@ PRESETS: dict[str, QualityPreset] = {
     # (docs/research/2026-09-24-uskorenie-turbo-sage-int8.md). Доводка
     # полной моделью сетку ослабляет, но не убирает.
     "Turbo": QualityPreset("Turbo", output_resolution=1024, num_inference_steps=6, turbo=True),
+    # Черновик: тот же дистиллят на площади 768² — перебрать промты и сиды,
+    # а понравившийся кадр повторить на Turbo тем же сидом. 5.4 с против 9.8
+    # на 1024² (×1.8, RTX 3090, INT8 + SageAttention), на фрагментах 1:1
+    # чисто (tools/experiments/lora_overhead.py, совет из сообщества). 896²
+    # почти ничего не даёт — 8.3 с, поэтому именно 768.
+    "TurboDraft": QualityPreset("TurboDraft", output_resolution=768, num_inference_steps=6, turbo=True),
 }
 
-NAMES: tuple[str, ...] = ("LowQuality", "MiddleQuality", "MaxQuality", "Turbo")
+NAMES: tuple[str, ...] = ("LowQuality", "MiddleQuality", "MaxQuality", "Turbo", "TurboDraft")
 DEFAULT = "MiddleQuality"
 
 

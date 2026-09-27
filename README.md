@@ -31,7 +31,8 @@ reference images. Everything runs on your own GPU.
 ## Features
 
 - **Text to image** at three quality presets plus **Turbo** (a 6-step distilled
-  model at 1 MP, about 2× faster than LowQuality), in seven aspect ratios, with 277 Fooocus styles and up
+  model at 1 MP, about 2× faster than LowQuality) and **TurboDraft** (the same
+  at 768 px, ~5 s, for trying prompts and seeds), in seven aspect ratios, with 277 Fooocus styles and up
   to eight images per run.
 - **Choose speed and memory**: bf16 or INT8 transformer weights (13.3 vs 6.8 GiB
   of VRAM, nearly the same speed) and optional SageAttention (15–25% faster
@@ -233,6 +234,7 @@ The full guide is in Russian: [docs/USAGE.md](docs/USAGE.md). The essentials fol
 | MiddleQuality | 1536 px | 28 | ~93 s |
 | MaxQuality | 2048 px | 40 | ~283 s |
 | **Turbo** | 1024 px | 6 | ~11 s |
+| **TurboDraft** | 768 px | 6 | ~5 s |
 
 **Turbo** uses [Qwen-Image-2.1-viggle-turbo](https://huggingface.co/Viggle/Qwen-Image-2.1-viggle-turbo),
 a distilled LoRA for this model: 6 steps without CFG instead of 16–40, for
@@ -242,6 +244,12 @@ INT8 and SageAttention and in the authors' own reference code, so Turbo is a
 fast 1 MP preset rather than a faster MiddleQuality. The adapter (1.3 GB) downloads the first
 time you pick the preset. Negative prompt and guidance are ignored in Turbo.
 Its authors have not validated mask editing and transparent (RGBA) output.
+
+**TurboDraft** is the same distilled model at 768 px: about 1.8× faster than
+Turbo (5.4 s vs 9.8 s on an RTX 3090 with INT8 and SageAttention) and clean
+at full size. Use it to try prompts and seeds, then repeat the one you like
+on Turbo or MiddleQuality with the same seed. (Suggested by a Reddit
+commenter; 896 px was measured too and barely helps: 8.3 s.)
 
 ### Speed and memory: precision and SageAttention
 

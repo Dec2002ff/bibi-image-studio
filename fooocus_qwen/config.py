@@ -39,7 +39,7 @@ LOG_DIR = PROJECT_ROOT / "logs"
 ENDPOINT_FILE = PROJECT_ROOT / "llm_endpoint.txt"
 SETTINGS_FILE = USER_DIR / "settings.json"
 
-PRESET_NAMES = ("LowQuality", "MiddleQuality", "MaxQuality", "Turbo")
+PRESET_NAMES = ("LowQuality", "MiddleQuality", "MaxQuality", "Turbo", "TurboDraft")
 
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 7865
