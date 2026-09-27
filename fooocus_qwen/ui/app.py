@@ -9,7 +9,7 @@ from pathlib import Path
 import gradio as gr
 
 from .. import config
-from . import layout, reference_tools, tab_edit, tab_gallery, tab_generate, tab_settings, viewer
+from . import gradio_fixes, layout, reference_tools, tab_edit, tab_gallery, tab_generate, tab_settings, viewer
 from .i18n import LANGUAGES, Localizer, pick
 from .state import Studio
 
@@ -45,6 +45,9 @@ def build(cfg: config.AppConfig, return_studio: bool = False):
     только ему: тесты собирают интерфейс без него и ничего лишнего не
     получают.
     """
+    # Поправки к Gradio (ui/gradio_fixes.py): повторная загрузка того же файла
+    # роняла событие под Windows, очистка временных файлов не работала.
+    gradio_fixes.install()
     studio = Studio(cfg)
     localizer = Localizer(cfg.lang)
 
