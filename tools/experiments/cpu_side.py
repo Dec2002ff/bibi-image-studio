@@ -51,9 +51,9 @@ def timed(label: str, function, repeats: int = 3) -> tuple[str, float]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Стоимость работы вне видеокарты")
+    parser = argparse.ArgumentParser(description="Cost of the work done off the GPU")
     parser.add_argument("--sizes", type=int, nargs="*", default=[1024, 2048, 4096],
-                        help="сторона квадратного кадра")
+                        help="side of the square frame")
     parser.add_argument("--repeats", type=int, default=3)
     args = parser.parse_args()
 
@@ -70,26 +70,26 @@ def main() -> int:
         soft = masking.refine(raw, grow=8, feather=12)
 
         measured = dict([
-            timed("отпечаток для кэша", lambda: fingerprint(source), args.repeats),
-            timed("refine маски", lambda: masking.refine(raw, grow=8, feather=12), args.repeats),
-            timed("маска в условное", lambda: masking.as_condition(soft), args.repeats),
-            timed("склейка blend", lambda: masking.blend(source, produced, soft), args.repeats),
-            timed("доля обрезанного", lambda: masking.clipped_share(source, produced, soft),
+            timed("cache fingerprint", lambda: fingerprint(source), args.repeats),
+            timed("mask refine", lambda: masking.refine(raw, grow=8, feather=12), args.repeats),
+            timed("mask to condition", lambda: masking.as_condition(soft), args.repeats),
+            timed("blend composite", lambda: masking.blend(source, produced, soft), args.repeats),
+            timed("clipped share", lambda: masking.clipped_share(source, produced, soft),
                   args.repeats),
-            timed("запись PNG", lambda: metadata.save_png(
+            timed("PNG write", lambda: metadata.save_png(
                 produced, OUT / f"probe-{side}.png", {"prompt": "x"}), args.repeats),
         ])
         rows[str(side)] = {key: round(value, 3) for key, value in measured.items()}
-        rows[str(side)]["ИТОГО"] = round(sum(measured.values()), 3)
+        rows[str(side)]["TOTAL"] = round(sum(measured.values()), 3)
         print(f"{side}x{side}: {rows[str(side)]}", flush=True)
 
     (OUT / "scores.json").write_text(json.dumps(rows, ensure_ascii=False, indent=2),
                                      encoding="utf-8")
 
-    print("\n=== секунды по размеру кадра ===")
-    labels = [key for key in rows[str(args.sizes[0])] if key != "ИТОГО"] + ["ИТОГО"]
+    print("\n=== seconds by frame size ===")
+    labels = [key for key in rows[str(args.sizes[0])] if key != "TOTAL"] + ["TOTAL"]
     header = " | ".join(f"{str(side) + 'px':>9}" for side in args.sizes)
-    print(f"{'операция':>22} | {header}")
+    print(f"{'operation':>22} | {header}")
     for label in labels:
         cells = " | ".join(f"{rows[str(side)][label]:>9}" for side in args.sizes)
         print(f"{label:>22} | {cells}")

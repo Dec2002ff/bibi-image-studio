@@ -98,7 +98,7 @@ def save_doc_image(image: Image.Image, name: str) -> Path:
         image = image.resize((DOC_WIDTH, round(image.height * DOC_WIDTH / image.width)), Image.LANCZOS)
     path = IMAGES / f"{name}.webp"
     image.convert("RGB").save(path, "WEBP", quality=90, method=6)
-    print(f"  -> {path.relative_to(ROOT)} ({path.stat().st_size // 1024} КБ)")
+    print(f"  -> {path.relative_to(ROOT)} ({path.stat().st_size // 1024} KB)")
     return path
 
 
@@ -144,7 +144,7 @@ def phase_showcase() -> None:
         shutil.copy(path, WORK / f"{name}.png")
         kept.append(path.relative_to(config.OUTPUT_DIR).as_posix())
         made.append(result.image)
-        print(f"{name}: {time.time() - started:.0f} с -> {path.name}")
+        print(f"{name}: {time.time() - started:.0f} s -> {path.name}")
         time.sleep(1.1)  # имена файлов — с точностью до секунды
     (WORK / "showcase.txt").write_text("\n".join(kept), encoding="utf-8")
     save_doc_image(side_by_side(made, height=560), "showcase")
@@ -177,7 +177,7 @@ def phase_ui(mask_box: tuple[float, float, float, float]) -> None:
         while time.time() < deadline and outputs() <= before:
             page.wait_for_timeout(1000)
         if outputs() <= before:
-            raise TimeoutError("результат не появился")
+            raise TimeoutError("no result appeared")
         page.wait_for_timeout(2500)  # результат доезжает до страницы
         return max(config.OUTPUT_DIR.rglob("*.png"), key=lambda p: p.stat().st_mtime)
 
@@ -185,7 +185,7 @@ def phase_ui(mask_box: tuple[float, float, float, float]) -> None:
         for item in locator.all():
             if item.is_visible():
                 return item
-        raise LookupError("нет видимого элемента")
+        raise LookupError("no visible element")
 
     def shot(page, name: str) -> None:
         # Снимок — только когда все видимые картинки догрузились: иначе в кадр
@@ -205,7 +205,7 @@ def phase_ui(mask_box: tuple[float, float, float, float]) -> None:
         browser = playwright.chromium.launch(headless=True)
 
         # Генерация с AI бустом.
-        print("генерация:")
+        print("generation:")
         # Окно выше обычного: в кадр должно войти поле переписанного промта.
         page, _ = u.fresh_page(browser, url, 1920, 1240)
         visible(page.get_by_label("LowQuality", exact=True)).check()
@@ -225,7 +225,7 @@ def phase_ui(mask_box: tuple[float, float, float, float]) -> None:
 
         # Окно поз, поза из библиотеки в ячейке и результат по ней; затем
         # окно эскиза.
-        print("поза и эскиз:")
+        print("pose and sketch:")
         from fooocus_qwen.poses import library
 
         names = [entry.name for entry in library.list_poses(config.POSE_LIBRARY_DIR, config.user_pose_dir())]
@@ -259,7 +259,7 @@ def phase_ui(mask_box: tuple[float, float, float, float]) -> None:
         page.close()
 
         # Правка по маске: кисть и результат рядом — широкое окно.
-        print("правка по маске:")
+        print("masked edit:")
         page, _ = u.fresh_page(browser, url, 2400, 1300)
         u.open_tab(page, 1)
         source = WORK / "showcase-mug.png"
@@ -280,7 +280,7 @@ def phase_ui(mask_box: tuple[float, float, float, float]) -> None:
         page.close()
 
         # Аннотация: палитра и пометки двумя цветами, без генерации.
-        print("аннотация:")
+        print("annotation:")
         page, _ = u.fresh_page(browser, url, 1920, 1080)
         u.open_tab(page, 1)
         source = WORK / "showcase-fox.png"
@@ -306,7 +306,7 @@ def phase_ui(mask_box: tuple[float, float, float, float]) -> None:
         page.close()
 
         # Расширение холста: исходник и результат.
-        print("расширение холста:")
+        print("outpaint:")
         page, _ = u.fresh_page(browser, url, 1920, 1080)
         u.open_tab(page, 1)
         source = WORK / "showcase-storefront.png"
@@ -328,12 +328,12 @@ def phase_ui(mask_box: tuple[float, float, float, float]) -> None:
         before = outputs()
         u.click_text(page, "Apply edit")
         widened = wait_for_output(before, page)
-        assert Image.open(widened).width / Image.open(widened).height > 1.6, "холст не расширился"
+        assert Image.open(widened).width / Image.open(widened).height > 1.6, "the canvas did not widen"
         save_doc_image(side_by_side([Image.open(source), Image.open(widened)], height=520), "outpaint-result")
         page.close()
 
         # Галерея с карточкой параметров.
-        print("галерея:")
+        print("gallery:")
         page, _ = u.fresh_page(browser, url, 1920, 1080)
         u.open_tab(page, 2)
         page.wait_for_timeout(1000)
@@ -343,7 +343,7 @@ def phase_ui(mask_box: tuple[float, float, float, float]) -> None:
         page.close()
 
         # Настройки: примерный адрес вместо настоящего, токена нет.
-        print("настройки:")
+        print("settings:")
         example = WORK / "llm_endpoint.txt"
         example.write_text("llama.cpp\n192.168.1.10:8080\n", encoding="utf-8")
         config.ENDPOINT_FILE = example
@@ -354,15 +354,15 @@ def phase_ui(mask_box: tuple[float, float, float, float]) -> None:
         page.close()
 
         browser.close()
-    print(f"готово; рабочие файлы: {WORK.relative_to(ROOT)}")
+    print(f"done; working files: {WORK.relative_to(ROOT)}")
 
 
 def main() -> int:
     use_utf8_console()
-    parser = argparse.ArgumentParser(description="Скриншоты и примеры для README")
+    parser = argparse.ArgumentParser(description="Screenshots and examples for the README")
     parser.add_argument("--phase", choices=["showcase", "ui"], required=True)
     parser.add_argument("--mask", type=float, nargs=4, default=(0.68, 0.64, 0.92, 0.86),
-                        metavar=("X0", "Y0", "X1", "Y1"), help="область маски на кадре с кружкой, доли")
+                        metavar=("X0", "Y0", "X1", "Y1"), help="mask area on the mug frame, as fractions")
     args = parser.parse_args()
     WORK.mkdir(parents=True, exist_ok=True)
     configure()

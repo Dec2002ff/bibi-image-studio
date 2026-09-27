@@ -75,7 +75,7 @@ def read_png(path: Path) -> dict[str, Any] | None:
         with Image.open(path) as image:
             raw = image.text.get(CHUNK_KEY)
     except (OSError, AttributeError) as error:
-        LOGGER.debug("Не удалось прочитать %s: %s", path, error)
+        LOGGER.debug("Failed to read %s: %s", path, error)
         return None
 
     if not raw:
@@ -84,7 +84,7 @@ def read_png(path: Path) -> dict[str, Any] | None:
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError as error:
-        LOGGER.debug("Испорченные метаданные в %s: %s", path, error)
+        LOGGER.debug("Corrupted metadata in %s: %s", path, error)
         return None
 
     return payload if isinstance(payload, dict) else None

@@ -42,10 +42,10 @@ def _load_payload(path: Path) -> tuple[dict[str, Any] | None, str | None]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
-        return None, f"Пресет {path.name} повреждён: {error}"
+        return None, f"Preset {path.name} is corrupted: {error}"
 
     if not isinstance(payload, dict):
-        return None, f"Пресет {path.name} повреждён: ожидался словарь, получен {type(payload).__name__}"
+        return None, f"Preset {path.name} is corrupted: expected a dict, got {type(payload).__name__}"
 
     return payload, None
 
@@ -113,7 +113,7 @@ def _resolve_candidates(name: str, directory: Path) -> _CandidateResolution:
 
 def save_prompt(name: str, payload: dict[str, Any], directory: Path) -> Path:
     if not name.strip():
-        raise ValueError("Имя пресета не может быть пустым")
+        raise ValueError("Preset name cannot be empty")
 
     directory.mkdir(parents=True, exist_ok=True)
     name_clean = name.strip()
@@ -128,7 +128,7 @@ def save_prompt(name: str, payload: dict[str, Any], directory: Path) -> Path:
         path = resolution.free
     else:
         # Все слоты заняты
-        raise RuntimeError(f"Не удалось найти свободное место для пресета {name_clean}: столкновение имён исчерпано")
+        raise RuntimeError(f"No free slot for preset {name_clean}: name collisions exhausted")
 
     stored = dict(payload)
     stored[_NAME_KEY] = name_clean
@@ -152,7 +152,7 @@ def load_prompt(name: str, directory: Path) -> dict[str, Any]:
         raise ValueError(error_msg)
 
     # Файл не найден
-    raise FileNotFoundError(f"Пресет промта не найден: {name.strip()}")
+    raise FileNotFoundError(f"Prompt preset not found: {name.strip()}")
 
 
 def list_prompts(directory: Path) -> list[str]:
@@ -163,7 +163,7 @@ def list_prompts(directory: Path) -> list[str]:
     for path in directory.glob("*.json"):
         payload, error_msg = _load_payload(path)
         if error_msg is not None:
-            LOGGER.warning("%s — пропущен в списке пресетов", error_msg)
+            LOGGER.warning("%s; skipped in the preset list", error_msg)
             continue
         names.append(payload.get(_NAME_KEY, path.stem))
     return sorted(names)

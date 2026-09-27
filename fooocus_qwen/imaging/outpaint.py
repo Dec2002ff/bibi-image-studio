@@ -44,7 +44,7 @@ def _ceil_multiple(value: int) -> int:
 def plan(size: tuple[int, int], sides: Sequence[str], amount: float) -> OutpaintPlan:
     unknown = [side for side in sides if side not in SIDES]
     if unknown:
-        raise ValueError(f"Неизвестная сторона расширения: {', '.join(unknown)}")
+        raise ValueError(f"Unknown outpaint side: {', '.join(unknown)}")
 
     width, height = size
     if not sides or amount <= 0:

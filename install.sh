@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Сборка окружения: .venv, torch с CUDA, остальные зависимости, проверка готовности.
-# Порядок шагов важен — см. комментарии в install.ps1.
+# Builds the environment: .venv, torch with CUDA, the other dependencies, a readiness check.
+# The order of the steps matters; see the comments in install.ps1.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,38 +13,38 @@ step() { printf '\n\033[36m[%s/7] %s\033[0m\n' "$1" "$2"; }
 cd "$root"
 
 if [ "${1:-}" = "--recreate" ] && [ -d "$venv" ]; then
-    echo "Удаляю прежнее окружение…"
+    echo "Removing the previous environment..."
     rm -rf "$venv"
 fi
 
-step 1 "Создаю окружение и ставлю torch с поддержкой CUDA"
+step 1 "Creating the environment and installing torch with CUDA"
 if [ ! -x "$python" ]; then
     python3.12 -m venv "$venv" 2>/dev/null || python3.13 -m venv "$venv" 2>/dev/null || python3 -m venv "$venv"
 fi
 "$python" -m pip install --upgrade pip setuptools wheel
 "$python" -m pip install torch torchvision --index-url "$torch_index"
 
-step 2 "Ставлю остальные зависимости"
+step 2 "Installing the other dependencies"
 "$python" -m pip install -r "$root/requirements.txt"
 
-step 3 "Возвращаю CUDA-сборку torch, если её заменили"
+step 3 "Restoring the CUDA build of torch if it was replaced"
 version="$("$python" -c 'import torch, sys; sys.stdout.write(torch.__version__)')"
 case "$version" in
-    *cu*) echo "  всё на месте: $version" ;;
-    *)    echo "  сейчас стоит $version — переустанавливаю"
+    *cu*) echo "  in place: $version" ;;
+    *)    echo "  found $version, reinstalling"
           "$python" -m pip install --force-reinstall torch torchvision --index-url "$torch_index" ;;
 esac
 
-step 4 "Выбираю точность весов и SageAttention"
+step 4 "Choosing weight precision and SageAttention"
 "$python" -m fooocus_qwen --setup-performance
 
-step 5 "Проверяю веса модели и распознавания поз"
+step 5 "Checking the model weights and the pose recognition weights"
 "$python" -m fooocus_qwen --fetch-model
 
-step 6 "Настраиваю языковую модель для AI-буста промтов"
+step 6 "Setting up the language model for prompt AI boost"
 "$python" -m fooocus_qwen --setup-llm
 
-step 7 "Проверяю готовность"
+step 7 "Checking readiness"
 "$python" -m fooocus_qwen --selftest
 
-printf '\n\033[32mГотово. Запуск:\033[0m\n    ./run.sh\n'
+printf '\n\033[32mDone. To start:\033[0m\n    ./run.sh\n'

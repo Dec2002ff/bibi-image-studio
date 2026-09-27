@@ -1,25 +1,26 @@
 ﻿<#
 .SYNOPSIS
-    Сборка окружения: .venv, torch с CUDA, остальные зависимости, проверка готовности.
+    Builds the environment: .venv, torch with CUDA, the other dependencies, a readiness check.
 
 .DESCRIPTION
-    Порядок шагов важен:
+    The order of the steps matters:
 
-    1. torch ставится ПЕРВЫМ и с индекса pytorch. Поставленный следом за
-       остальными, он приедет с PyPI — без CUDA, и всё пойдёт на процессоре.
-    2. Остальные зависимости из requirements.txt.
-    3. torch закрепляется ещё раз: сторонние пакеты способны подменить
-       CUDA-сборку на обычную.
-    4. Производительность: точность весов (bf16 или INT8) и SageAttention.
-       От ответа зависит, что качает следующий шаг.
-    5. Веса модели: около тридцати трёх гигабайт при bf16, двадцати шести
-       при INT8; качаются только недостающие.
-    6. Адрес языковой модели для AI-буста промтов — по желанию.
-    7. Самопроверка: «установилось» должно означать «запустится».
+    1. torch is installed FIRST, from the PyTorch index. Installed after the
+       other packages, it would come from PyPI without CUDA, and everything
+       would run on the CPU.
+    2. The other dependencies from requirements.txt.
+    3. torch is pinned once more: third-party packages can replace the CUDA
+       build with a plain one.
+    4. Performance: weight precision (bf16 or INT8) and SageAttention. The
+       answer decides what the next step downloads.
+    5. Model weights (about 33 GB for bf16, 26 GB for INT8) and the pose
+       recognition weights (DWPose, 350 MB); only missing files are downloaded.
+    6. The language model address for prompt AI boost (optional).
+    7. Self-test: "installed" must mean "will start".
 
-    Шаги 4–6 делает сам пакет (`--setup-performance`, `--fetch-model`,
-    `--setup-llm`): то же самое, написанное дважды на двух языках оболочки,
-    разъезжается.
+    Steps 4-6 are done by the package itself (--setup-performance,
+    --fetch-model, --setup-llm): the same logic written twice, in two shell
+    languages, drifts apart.
 
 .EXAMPLE
     .\install.ps1
@@ -32,7 +33,8 @@
 param([switch] $Recreate)
 
 $ErrorActionPreference = 'Stop'
-# Консоль Windows по умолчанию не UTF-8, и русский текст выводится мусором.
+# The Windows console is not UTF-8 by default; pip and the package may print
+# non-ASCII text (paths, model names).
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Definition
@@ -48,55 +50,55 @@ function Step($number, $text) {
 Push-Location $root
 try {
     if ($Recreate -and (Test-Path $venv)) {
-        Write-Host 'Удаляю прежнее окружение…' -ForegroundColor Yellow
+        Write-Host 'Removing the previous environment...' -ForegroundColor Yellow
         Remove-Item -Recurse -Force $venv
     }
 
-    Step 1 'Создаю окружение и ставлю torch с поддержкой CUDA'
+    Step 1 'Creating the environment and installing torch with CUDA'
     if (-not (Test-Path $python)) {
         py -3.12 -m venv $venv
         if ($LASTEXITCODE -ne 0) {
-            Write-Host '  Python 3.12 не найден, пробую 3.13' -ForegroundColor Yellow
+            Write-Host '  Python 3.12 not found, trying 3.13' -ForegroundColor Yellow
             py -3.13 -m venv $venv
         }
-        if (-not (Test-Path $python)) { throw 'Не удалось создать .venv' }
+        if (-not (Test-Path $python)) { throw 'Could not create .venv' }
     }
     & $python -m pip install --upgrade pip setuptools wheel
-    if ($LASTEXITCODE -ne 0) { throw 'Не удалось обновить pip' }
+    if ($LASTEXITCODE -ne 0) { throw 'Could not upgrade pip' }
 
     & $python -m pip install torch torchvision --index-url $torchIndex
-    if ($LASTEXITCODE -ne 0) { throw 'Не удалось поставить torch с CUDA' }
+    if ($LASTEXITCODE -ne 0) { throw 'Could not install torch with CUDA' }
 
-    Step 2 'Ставлю остальные зависимости'
+    Step 2 'Installing the other dependencies'
     & $python -m pip install -r (Join-Path $root 'requirements.txt')
-    if ($LASTEXITCODE -ne 0) { throw 'Не удалось поставить зависимости' }
+    if ($LASTEXITCODE -ne 0) { throw 'Could not install the dependencies' }
 
-    Step 3 'Возвращаю CUDA-сборку torch, если её заменили'
+    Step 3 'Restoring the CUDA build of torch if it was replaced'
     $version = & $python -c "import torch, sys; sys.stdout.write(torch.__version__)"
     if ($version -notlike '*cu*') {
-        Write-Host "  сейчас стоит $version — переустанавливаю" -ForegroundColor Yellow
+        Write-Host "  found $version, reinstalling" -ForegroundColor Yellow
         & $python -m pip install --force-reinstall torch torchvision --index-url $torchIndex
-        if ($LASTEXITCODE -ne 0) { throw 'Не удалось вернуть torch с CUDA' }
+        if ($LASTEXITCODE -ne 0) { throw 'Could not restore torch with CUDA' }
     } else {
-        Write-Host "  всё на месте: $version"
+        Write-Host "  in place: $version"
     }
 
-    Step 4 'Выбираю точность весов и SageAttention'
+    Step 4 'Choosing weight precision and SageAttention'
     & $python -m fooocus_qwen --setup-performance
 
-    Step 5 'Проверяю веса модели и распознавания поз'
+    Step 5 'Checking the model weights and the pose recognition weights'
     & $python -m fooocus_qwen --fetch-model
-    if ($LASTEXITCODE -ne 0) { throw 'Не удалось получить веса модели' }
+    if ($LASTEXITCODE -ne 0) { throw 'Could not get the model weights' }
 
-    Step 6 'Настраиваю языковую модель для AI-буста промтов'
+    Step 6 'Setting up the language model for prompt AI boost'
     & $python -m fooocus_qwen --setup-llm
 
-    Step 7 'Проверяю готовность'
+    Step 7 'Checking readiness'
     & $python -m fooocus_qwen --selftest
-    if ($LASTEXITCODE -ne 0) { throw 'Самопроверка не пройдена' }
+    if ($LASTEXITCODE -ne 0) { throw 'Self-test failed' }
 
     Write-Host ''
-    Write-Host 'Готово. Запуск:' -ForegroundColor Green
+    Write-Host 'Done. To start:' -ForegroundColor Green
     Write-Host '    .\run.ps1' -ForegroundColor Cyan
 } finally {
     Pop-Location

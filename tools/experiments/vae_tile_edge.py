@@ -42,14 +42,14 @@ SOURCE = config.OUTPUT_DIR / "2026-09-22" / "19-35-06.png"
 
 @torch.no_grad()
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Краевой артефакт плитки VAE")
+    parser = argparse.ArgumentParser(description="VAE tile edge artifact")
     parser.add_argument("--source", type=Path, default=SOURCE)
-    parser.add_argument("--tile", type=int, default=512, help="плитка в пикселях кадра")
+    parser.add_argument("--tile", type=int, default=512, help="tile size in frame pixels")
     args = parser.parse_args()
 
     from diffusers import AutoencoderKLQwenImage21
 
-    print("гружу VAE…", flush=True)
+    print("loading VAE…", flush=True)
     vae = AutoencoderKLQwenImage21.from_pretrained(
         config.MODEL_DIR, subfolder="vae", torch_dtype=torch.bfloat16
     ).to("cuda")
@@ -68,17 +68,17 @@ def main() -> int:
     array = np.concatenate([array, opaque], axis=2)
     x = torch.from_numpy(array).permute(2, 0, 1)[None, :, None].to("cuda", torch.bfloat16)
 
-    print(f"кодирую {width}x{height}…", flush=True)
+    print(f"encoding {width}x{height}…", flush=True)
     vae.disable_tiling()
     latent = vae.encode(x).latent_dist.mode()
 
-    print("декодирую целиком…", flush=True)
+    print("decoding whole…", flush=True)
     whole = vae.decode(latent, return_dict=False)[0][:, :, 0]
     whole = _to_numpy(whole)
 
     ratio = vae.spatial_compression_ratio
     tile_latent = args.tile // ratio
-    print(f"декодирую одну плитку {args.tile}x{args.tile} (латент {tile_latent})…", flush=True)
+    print(f"decoding a single tile {args.tile}x{args.tile} (latent {tile_latent})…", flush=True)
     piece = vae.decode(latent[:, :, :, :tile_latent, :tile_latent], return_dict=False)[0][:, :, 0]
     piece = _to_numpy(piece)
 
@@ -87,37 +87,37 @@ def main() -> int:
     by_column = diff.mean(axis=0)
     middle = float(np.median(by_column[args.tile // 4 : args.tile * 3 // 4]))
 
-    print(f"\nсередина плитки (фон вранья): {middle:.3f} уровня из 255")
-    print("\nпоследние столбцы плитки — тот самый край:")
+    print(f"\ntile middle (error background): {middle:.3f} levels of 255")
+    print("\nlast columns of the tile, the edge in question:")
     for offset in (0, 1, 2, 3, 4, 6, 8, 10, 12, 16, 20, 24, 32, 48, 64):
         column = args.tile - 1 - offset
         value = by_column[column]
         # Вес, с которым этот столбец входит в результат при шаге 256.
         weight = max(0.0, 1.0 - (256 - 1 - offset) / 256) if offset < 256 else 0.0
         print(
-            f"  край−{offset:<3d} (x={column:3d}): врёт на {value:7.3f}"
-            f"  (×{value / max(middle, 1e-6):5.1f} к фону), вес в смеси {weight * 100:4.1f} %"
-            f"  → вклад {value * weight:6.3f}"
+            f"  edge−{offset:<3d} (x={column:3d}): off by {value:7.3f}"
+            f"  (×{value / max(middle, 1e-6):5.1f} of background), blend weight {weight * 100:4.1f} %"
+            f"  → contribution {value * weight:6.3f}"
         )
 
-    print("\nпервые столбцы плитки (второй край, для симметрии):")
+    print("\nfirst columns of the tile (the other edge, for symmetry):")
     for column in (0, 1, 2, 4, 8, 16, 32):
-        print(f"  x={column:3d}: врёт на {by_column[column]:7.3f} (×{by_column[column] / max(middle, 1e-6):5.1f})")
+        print(f"  x={column:3d}: off by {by_column[column]:7.3f} (×{by_column[column] / max(middle, 1e-6):5.1f})")
 
     # Вторая ось: артефакт обязан быть и на нижнем крае — обрезать придётся оба.
     by_row = diff.mean(axis=1)
     middle_row = float(np.median(by_row[args.tile // 4 : args.tile * 3 // 4]))
     print()
-    print(f"нижний край плитки (фон по строкам {middle_row:.3f}):")
+    print(f"bottom edge of the tile (row background {middle_row:.3f}):")
     for offset in (0, 2, 4, 8, 16, 24, 32, 48):
         row = args.tile - 1 - offset
-        print(f"  край−{offset:<3d} (y={row:3d}): врёт на {by_row[row]:7.3f} (×{by_row[row] / max(middle_row, 1e-6):5.1f})")
-    print("верхний край:", ", ".join(f"y={r}: {by_row[r]:.3f}" for r in (0, 1, 2, 4, 8)))
+        print(f"  edge−{offset:<3d} (y={row:3d}): off by {by_row[row]:7.3f} (×{by_row[row] / max(middle_row, 1e-6):5.1f})")
+    print("top edge:", ", ".join(f"y={r}: {by_row[r]:.3f}" for r in (0, 1, 2, 4, 8)))
 
     trusted = _trusted_margin(by_column, middle)
     print(
-        f"\nВывод: у края плитки нельзя доверять примерно {trusted} столбцам — "
-        f"дальше вранье падает ниже утроенного фона."
+        f"\nConclusion: about {trusted} columns at the tile edge cannot be trusted; "
+        f"beyond them the error drops below three times the background."
     )
     return 0
 

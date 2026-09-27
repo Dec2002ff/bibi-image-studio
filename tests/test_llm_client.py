@@ -101,7 +101,7 @@ def test_unreachable_server_raises_llm_error():
 
 def test_non_latin1_token_raises_llm_error_from_ping_with_a_readable_message():
     client = LlmClient(LlmEndpoint(base_url="http://127.0.0.1:1", token="ЗАМЕНИТЕ_НА_СВОЙ_ТОКЕН"))
-    with pytest.raises(LlmError, match="[Тт]окен"):
+    with pytest.raises(LlmError, match="[Tt]oken"):
         client.ping()
 
 
@@ -110,7 +110,7 @@ def test_non_latin1_token_raises_llm_error_from_complete_the_same_way():
     # AI-буст (через complete) и «Проверить связь» (через ping) расходились бы
     # в поведении на одном и том же битом токене.
     client = LlmClient(LlmEndpoint(base_url="http://127.0.0.1:1", token="ЗАМЕНИТЕ_НА_СВОЙ_ТОКЕН"))
-    with pytest.raises(LlmError, match="[Тт]окен"):
+    with pytest.raises(LlmError, match="[Tt]oken"):
         client.complete("системный", "пользовательский")
 
 
@@ -138,7 +138,7 @@ def test_server_error_on_a_request_with_an_image_hints_at_missing_vision(monkeyp
         _raising_urlopen(urllib.error.HTTPError("u", 500, "Internal Server Error", {}, None)),
     )
     client = LlmClient(LlmEndpoint(base_url="http://example.invalid"))
-    with pytest.raises(LlmError, match="не умеет их читать"):
+    with pytest.raises(LlmError, match="may not be able to read images"):
         client.complete("s", "u", images=[Image.new("RGB", (8, 8), "red")])
 
 
@@ -212,12 +212,12 @@ def test_a_text_only_model_is_named_as_the_likely_cause(blind_server):
 
     text = str(failure.value)
     assert "500" in text, "техническая причина обязана остаться в сообщении"
-    assert "не умеет их читать" in text, text
+    assert "may not be able to read images" in text, text
     # Оба пути сюда ведут: кнопка описания и AI буст при правке с
     # референсами. Называть только кнопку значило бы вводить в заблуждение
     # того, кто пришёл через буст.
-    assert "Описать изображение" in text
-    assert "буст" in text
+    assert "Describe image" in text
+    assert "AI boost" in text
 
 
 

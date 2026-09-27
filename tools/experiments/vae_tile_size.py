@@ -87,12 +87,12 @@ def decode(pipe, latents, height: int, width: int) -> Image.Image:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Размер плитки VAE против полос")
+    parser = argparse.ArgumentParser(description="VAE tile size versus stripes")
     parser.add_argument("--steps", type=int, default=STEPS)
     parser.add_argument("--size", type=int, nargs=2, default=None,
-                        help="кадр, по умолчанию 1280 1888")
+                        help="frame size, 1280 1888 by default")
     parser.add_argument("--evict", action="store_true",
-                        help="выселить трансформер на хост перед декодированием")
+                        help="evict the transformer to the host before decoding")
     args = parser.parse_args()
 
     logging_setup.setup_logging(False)
@@ -101,7 +101,7 @@ def main() -> int:
     width, height = args.size if args.size else (WIDTH, HEIGHT)
     pipe, residency, _cache = loader.load(config.MODEL_DIR)
 
-    print(f"кадр {width}x{height}; считаю латент один раз…", flush=True)
+    print(f"frame {width}x{height}; computing the latent once…", flush=True)
     latents = pipe(
         prompt=PROMPT,
         height=height,
@@ -119,8 +119,8 @@ def main() -> int:
     # 64 пикселя, и он виден. ``enable_tiling`` шаг не принимает, но поле
     # у VAE открытое.
     variants: list[tuple[str, int, int]] = [
-        ("без тайлинга", 0, 0),
-        ("256/192 (сейчас)", 256, 192),
+        ("no tiling", 0, 0),
+        ("256/192 (current)", 256, 192),
         ("256/128", 256, 128),
         ("512/256", 512, 256),
         ("768/384", 768, 384),
@@ -148,7 +148,7 @@ def main() -> int:
             image = decode(pipe, latents, height, width)
         except torch.cuda.OutOfMemoryError:
             torch.cuda.empty_cache()
-            rows[key] = {"ok": False, "reason": "нехватка видеопамяти"}
+            rows[key] = {"ok": False, "reason": "out of video memory"}
             print(f"{key}: {rows[key]}", flush=True)
             continue
 
@@ -163,16 +163,16 @@ def main() -> int:
             json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8"
         )
 
-    print("\n=== сводка ===")
-    print(f"{'вариант':>16} | {'полосы СКО':>10} | {'пик':>5} | {'столбцов':>8} | "
-          f"{'с':>5} | {'ГиБ':>6}")
+    print("\n=== summary ===")
+    print(f"{'variant':>16} | {'stripe SD':>10} | {'peak':>5} | {'columns':>8} | "
+          f"{'s':>5} | {'GiB':>6}")
     for key, row in rows.items():
         if not row.get("ok"):
             print(f"{key:>16} | {row['reason']}")
             continue
         print(f"{key:>16} | {row['stripe_sigma']:>10} | {row['stripe_peak']:>5} | "
               f"{row['bright_columns']:>8} | {row['decode_seconds']:>5} | {row['peak_vram_gib']:>6}")
-    print(f"\nкадры: {OUT}")
+    print(f"\nframes: {OUT}")
     return 0
 
 

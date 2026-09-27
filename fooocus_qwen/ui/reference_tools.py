@@ -55,14 +55,21 @@ SKETCH_COLOURS: tuple[str, ...] = (
 # ещё не открывалась, Gradio рисует позже загрузки, поэтому скрипт ещё и
 # следит за появлением новых значков (наблюдатель ставится один раз и
 # проверяет только новые узлы, так что стоит копейки).
+#
+# Язык скрипт читает с кнопки переключателя (на ней — текущий язык), а не из
+# аргумента: язык приложения живёт в ``gr.State``, а состояние Gradio в
+# JS-обработчик не передаётся — аргумент приходил пустым, и в английском
+# интерфейсе подсказки оставались русскими (найдено, когда английский стал
+# языком по умолчанию).
 TOOL_TITLES = {
     layout.REF_POSE: ("Поза: выбрать из библиотеки или по фото", "Pose: pick from the library or from a photo"),
     layout.REF_SKETCH: ("Эскиз: нарисовать от руки", "Sketch: draw by hand"),
 }
 TITLES_JS = """
-(lang) => {
+() => {
     const titles = __TITLES__;
-    window.__qsToolLang = lang;
+    const button = document.querySelector('.qs-lang');
+    window.__qsToolLang = button ? button.innerText.trim().toLowerCase() : 'en';
     const apply = root => {
         for (const [cls, pair] of Object.entries(titles)) {
             const nodes = root.classList && root.classList.contains(cls)
@@ -226,7 +233,7 @@ def build(
         except detect.NoPersonFound:
             return (*keep, gr.update(), gr.update(), gr.update(), say("pose_not_found", lang), None)
         except Exception as error:  # noqa: BLE001 — веса, сеть, onnxruntime: строка в окне
-            LOGGER.exception("Поза не распознана")
+            LOGGER.exception("Pose not recognized")
             return (*keep, gr.update(), gr.update(), gr.update(), say("pose_failed", lang, error=error), None)
 
         entry = library.add_custom(config.user_pose_dir(), found)

@@ -171,7 +171,7 @@ class Studio:
         try:
             self.ensure_turbo_weights()
         except Exception as error:  # noqa: BLE001 — сеть, диск, Hugging Face: всё это строка состояния
-            LOGGER.exception("Веса turbo не скачались")
+            LOGGER.exception("Turbo weights download failed")
             return say("turbo_download_failed", lang, error=_quote(error))
         return None
 
@@ -235,7 +235,7 @@ class Studio:
             torch.cuda.empty_cache()
         except ImportError:  # pragma: no cover
             pass
-        LOGGER.info("Модель выгружена")
+        LOGGER.info("Model unloaded")
 
     def set_sage_attention(self, enabled: bool) -> bool:
         """Сохраняет выбор и, если модель загружена, применяет его сразу.
@@ -272,9 +272,9 @@ class Studio:
         def warm() -> None:
             try:
                 self.generator  # noqa: B018 — обращение и есть загрузка
-                LOGGER.info("Модель загружена заранее, первая генерация начнётся сразу")
+                LOGGER.info("Model preloaded; the first generation will start immediately")
             except Exception:  # noqa: BLE001 — показывать некому, запрос повторит
-                LOGGER.exception("Фоновая загрузка модели не удалась")
+                LOGGER.exception("Background model loading failed")
 
         threading.Thread(target=warm, name="preload", daemon=True).start()
 
@@ -313,7 +313,7 @@ class Studio:
         try:
             return self.generator.generate(request, progress=progress), None
         except Exception as error:  # noqa: BLE001 — тост с traceback хуже строки статуса
-            LOGGER.exception("Генерация не выполнена")
+            LOGGER.exception("Generation failed")
             self.recover_residency()
             return [], describe_failure(error, lang)
 
@@ -366,7 +366,7 @@ class Studio:
                 references=references, send_images=key not in self._text_only_models, tags=tags,
             )
         except (LlmError, FileNotFoundError, ValueError, OSError) as error:
-            LOGGER.warning("AI-буст не выполнен: %s", error)
+            LOGGER.warning("AI boost failed: %s", error)
             return prompt, None, say("boost_failed", lang, error=error)
         if result.images_skipped:
             self._text_only_models.add(key)
@@ -377,6 +377,6 @@ class Studio:
         try:
             text = boost.describe(self.llm_client(), image, config.SYSTEM_PROMPT_DIR)
         except (LlmError, FileNotFoundError, ValueError, OSError) as error:
-            LOGGER.warning("Описание не выполнено: %s", error)
+            LOGGER.warning("Describe failed: %s", error)
             return "", say("describe_failed", lang, error=error)
         return text, say("describe_done", lang)

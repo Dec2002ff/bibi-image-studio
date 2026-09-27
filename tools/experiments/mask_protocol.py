@@ -103,7 +103,7 @@ def scores(source: Image.Image, produced: Image.Image, binary: np.ndarray) -> di
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Подбор протокола передачи маски модели")
+    parser = argparse.ArgumentParser(description="Choosing the protocol for passing the mask to the model")
     parser.add_argument("--steps", type=int, default=16)
     parser.add_argument("--resolution", type=int, default=1024)
     args = parser.parse_args()
@@ -141,15 +141,15 @@ def main() -> int:
                 json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8"
             )
 
-    print("\n=== сводка (чем выше отношение, тем точнее попадание в маску) ===")
-    print(f"{'вариант':>16} | {'внутри':>7} | {'снаружи':>8} | {'отнош.':>7} | "
-          f"{'снаружи изм.':>13} | {'непрозр. внутри':>16}")
+    print("\n=== summary (the higher the ratio, the more precisely the mask is hit) ===")
+    print(f"{'variant':>16} | {'inside':>7} | {'outside':>8} | {'ratio':>7} | "
+          f"{'outside chg.':>13} | {'opaque inside':>16}")
     for key, row in sorted(rows.items(), key=lambda item: -item[1]["ratio"]):
         print(f"{key:>16} | {row['inside_mean']:>7} | {row['outside_mean']:>8} | "
               f"{row['ratio']:>7} | {row['outside_changed_pct']:>12} % | "
               f"{row['opaque_inside_pct']:>15} %")
-    print(f"\nперестановок энкодера: {int(residency.stats()['swaps'])}")
-    print(f"кадры: {OUT}")
+    print(f"\nencoder swaps: {int(residency.stats()['swaps'])}")
+    print(f"frames: {OUT}")
     return 0
 
 

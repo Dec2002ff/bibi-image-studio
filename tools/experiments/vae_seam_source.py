@@ -84,12 +84,12 @@ def latent_periodicity(latent: torch.Tensor, stride_latent: int) -> str:
     sigma = float(residual.std())
     marks = [i for i in range(len(residual)) if abs(residual[i]) > 3 * sigma]
     on_grid = [i for i in marks if (i + 1) % stride_latent <= 1 or (i + 1) % stride_latent >= stride_latent - 1]
-    return f"СКО {sigma:.4f}, выбросов {len(marks)}, из них на решётке плиток {len(on_grid)}"
+    return f"SD {sigma:.4f}, outliers {len(marks)}, of them on the tile grid {len(on_grid)}"
 
 
 @torch.no_grad()
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Источник полос: декодер или латент")
+    parser = argparse.ArgumentParser(description="Source of the stripes: decoder or latent")
     parser.add_argument("--tile", type=int, default=512)
     parser.add_argument("--stride", type=int, default=256)
     parser.add_argument("--latent", type=Path, default=OUT / "latent.pt")
@@ -101,10 +101,10 @@ def main() -> int:
     pipe, residency, _cache = loader.load(config.MODEL_DIR, pin_memory=False)
 
     if args.latent.is_file():
-        print(f"беру готовый латент {args.latent}", flush=True)
+        print(f"using the ready latent {args.latent}", flush=True)
         latents = torch.load(args.latent).to(pipe._execution_device)
     else:
-        print(f"считаю латент {WIDTH}x{HEIGHT}, {STEPS} шагов…", flush=True)
+        print(f"computing the latent {WIDTH}x{HEIGHT}, {STEPS} steps…", flush=True)
         latents = pipe(
             prompt=PROMPT,
             height=HEIGHT,
@@ -123,21 +123,21 @@ def main() -> int:
     z = unpacked * std + mean
 
     ratio = pipe.vae.spatial_compression_ratio
-    print("\nсам латент:", latent_periodicity(z, args.stride // ratio))
+    print("\nlatent itself:", latent_periodicity(z, args.stride // ratio))
 
     # Трансформер на время декодирования не нужен, а место нужно: цельное
     # декодирование просит около шестнадцати гигабайт.
     residency._transformer.to_host()  # опыт лезет во внутренности намеренно
 
     results = {}
-    for name in ("целиком", "diffusers", "здешний"):
-        if name == "целиком":
+    for name in ("whole", "diffusers", "ours"):
+        if name == "whole":
             pipe.vae.disable_tiling()
         else:
             pipe.vae.enable_tiling(tile_sample_min_height=args.tile, tile_sample_min_width=args.tile)
             pipe.vae.tile_sample_stride_height = args.stride
             pipe.vae.tile_sample_stride_width = args.stride
-            if name == "здешний":
+            if name == "ours":
                 vae_tiling.install(pipe.vae)
             else:
                 # Загрузчик ставит здешний декодер сразу при загрузке: без
@@ -157,8 +157,8 @@ def main() -> int:
         image.save(OUT / f"{name}.png")
         results[name] = (np.asarray(image.convert("RGB"), dtype=np.float32), seconds, peak)
 
-    reference = results["целиком"][0]
-    print(f"\n{'вариант':12} {'верт.':>6} {'гориз.':>7} {'макс. откл.':>12} {'расх. с целым':>14} {'с':>6} {'ГиБ':>6}")
+    reference = results["whole"][0]
+    print(f"\n{'variant':12} {'vert.':>6} {'horiz.':>7} {'max dev.':>12} {'diff vs whole':>14} {'s':>6} {'GiB':>6}")
     for name, (array, seconds, peak) in results.items():
         vertical = chroma_lines(array, args.stride, axis=0)
         horizontal = chroma_lines(array, args.stride, axis=1)
@@ -169,10 +169,10 @@ def main() -> int:
             f"{delta:14.4f} {seconds:6.2f} {peak:6.2f}"
         )
         if vertical["where"]:
-            print(f"             вертикальные x = {vertical['where']}")
+            print(f"             vertical x = {vertical['where']}")
         if horizontal["where"]:
-            print(f"             горизонтальные y = {horizontal['where']}")
-    print(f"\nкадры сохранены в {OUT}")
+            print(f"             horizontal y = {horizontal['where']}")
+    print(f"\nframes saved to {OUT}")
     return 0
 
 

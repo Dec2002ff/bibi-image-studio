@@ -87,7 +87,7 @@ def stripe_strength(image: Image.Image) -> dict:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Тайлинг и точность VAE против полос")
+    parser = argparse.ArgumentParser(description="VAE tiling and precision versus stripes")
     parser.add_argument("--steps", type=int, default=STEPS)
     args = parser.parse_args()
 
@@ -96,12 +96,12 @@ def main() -> int:
 
     pipe, residency, _cache = loader.load(config.MODEL_DIR)
     original_dtype = next(pipe.vae.parameters()).dtype
-    print(f"VAE загружен в {original_dtype}\n", flush=True)
+    print(f"VAE loaded in {original_dtype}\n", flush=True)
 
     rows: dict[str, dict] = {}
     for tiling in (True, False):
         for dtype in (original_dtype, torch.float32):
-            key = f"{'тайлинг' if tiling else 'целиком'}+{str(dtype).split('.')[-1]}"
+            key = f"{'tiled' if tiling else 'whole'}+{str(dtype).split('.')[-1]}"
             if tiling:
                 pipe.vae.enable_tiling()
             else:
@@ -122,7 +122,7 @@ def main() -> int:
                 ).images[0]
             except torch.cuda.OutOfMemoryError as error:
                 torch.cuda.empty_cache()
-                rows[key] = {"ok": False, "reason": "нехватка видеопамяти", "detail": str(error)[:80]}
+                rows[key] = {"ok": False, "reason": "out of video memory", "detail": str(error)[:80]}
                 print(f"{key}: {rows[key]}", flush=True)
                 continue
 
@@ -138,17 +138,17 @@ def main() -> int:
 
     pipe.vae.to(original_dtype)
 
-    print("\n=== сводка (чем меньше полос, тем лучше) ===")
-    print(f"{'вариант':>22} | {'полосы, СКО':>11} | {'пик':>5} | {'столбцов':>8} | "
-          f"{'с':>6} | {'ГиБ':>5}")
+    print("\n=== summary (fewer stripes is better) ===")
+    print(f"{'variant':>22} | {'stripes, SD':>11} | {'peak':>5} | {'columns':>8} | "
+          f"{'s':>6} | {'GiB':>5}")
     for key, row in sorted(rows.items(), key=lambda item: item[1].get("stripe_sigma", 99)):
         if not row.get("ok"):
             print(f"{key:>22} | {row['reason']}")
             continue
         print(f"{key:>22} | {row['stripe_sigma']:>11} | {row['stripe_peak']:>5} | "
               f"{row['bright_columns']:>8} | {row['seconds']:>6} | {row['peak_vram_gib']:>5}")
-    print(f"\nперестановок энкодера: {int(residency.stats()['swaps'])}")
-    print(f"кадры: {OUT}")
+    print(f"\nencoder swaps: {int(residency.stats()['swaps'])}")
+    print(f"frames: {OUT}")
     return 0
 
 

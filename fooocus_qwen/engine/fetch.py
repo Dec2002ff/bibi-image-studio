@@ -111,11 +111,11 @@ def ensure_model(
     model_dir = Path(model_dir)
     missing = missing_files(model_dir, include_transformer)
     if not missing:
-        LOGGER.info("Веса на месте: %s", model_dir)
+        LOGGER.info("Weights found: %s", model_dir)
         return False
 
     LOGGER.info(
-        "Не хватает файлов весов (%d, первый — %s). Качаю %s в %s, это примерно %d ГБ.",
+        "Missing weight files (%d, first: %s). Downloading %s to %s, about %d GB.",
         len(missing),
         missing[0],
         repo_id,
@@ -130,11 +130,11 @@ def ensure_model(
     still_missing = missing_files(model_dir, include_transformer)
     if still_missing:
         raise ModelDownloadError(
-            "Загрузка весов не довела дело до конца, не хватает "
-            f"{len(still_missing)} файлов, первый — {still_missing[0]}. "
-            f"Повторите установку: докачается только недостающее."
+            "Weight download did not complete, missing "
+            f"{len(still_missing)} files, first: {still_missing[0]}. "
+            f"Run the installation again: only the missing files will be downloaded."
         )
-    LOGGER.info("Веса скачаны: %s", model_dir)
+    LOGGER.info("Weights downloaded: %s", model_dir)
     return True
 
 
@@ -185,7 +185,7 @@ def ensure_files(
     missing = missing_extra(directory, files)
     if not missing:
         return False
-    LOGGER.info("Качаю %s из %s в %s", ", ".join(missing), repo_id, directory)
+    LOGGER.info("Downloading %s from %s to %s", ", ".join(missing), repo_id, directory)
     directory.mkdir(parents=True, exist_ok=True)
     download = downloader or _file_download
     for name in missing:
@@ -193,8 +193,8 @@ def ensure_files(
     still_missing = missing_extra(directory, files)
     if still_missing:
         raise ModelDownloadError(
-            f"Загрузка не довела дело до конца, не хватает {', '.join(still_missing)}. "
-            "Повторите: докачается только недостающее."
+            f"Download did not complete, missing {', '.join(still_missing)}. "
+            "Run it again: only the missing files will be downloaded."
         )
     return True
 

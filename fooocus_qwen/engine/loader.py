@@ -90,8 +90,8 @@ def load_int8_transformer(model_dir: Path, int8_file: Path):
     problems = [*result.missing_keys, *result.unexpected_keys, *leftover]
     if problems:
         raise RuntimeError(
-            f"INT8-веса не подходят к трансформеру: {len(problems)} несовпадений, первое — {problems[0]}. "
-            "Файл повреждён или от другой версии модели; удалите его, и он скачается заново."
+            f"INT8 weights do not match the transformer: {len(problems)} mismatches, first: {problems[0]}. "
+            "The file is corrupted or belongs to another model version; delete it and it will be downloaded again."
         )
 
     quantized = 0
@@ -100,7 +100,7 @@ def load_int8_transformer(model_dir: Path, int8_file: Path):
         if weight is not None and hasattr(weight, "act_quant_kwargs"):
             weight.act_quant_kwargs = None
             quantized += 1
-    LOGGER.info("INT8-трансформер: %d слоёв в INT8 (только веса)", quantized)
+    LOGGER.info("INT8 transformer: %d layers in INT8 (weights only)", quantized)
     return transformer.eval()
 
 
@@ -125,7 +125,7 @@ def load(
     assert_contract()
 
     started = time.perf_counter()
-    LOGGER.info("Загружаю модель из %s%s", model_dir, " (трансформер INT8)" if int8_file else "")
+    LOGGER.info("Loading model from %s%s", model_dir, " (INT8 transformer)" if int8_file else "")
     extra = {"transformer": load_int8_transformer(model_dir, int8_file)} if int8_file else {}
     pipe = QwenImage21StudioPipeline.from_pretrained(str(model_dir), dtype=torch.bfloat16, **extra)
     attention.apply(pipe.transformer, sage_attention)
@@ -138,5 +138,5 @@ def load(
     cache = EmbedsCache(capacity=cache_capacity)
     pipe.attach(residency, cache, torch.device(device))
 
-    LOGGER.info("Модель готова за %.1f с", time.perf_counter() - started)
+    LOGGER.info("Model ready in %.1f s", time.perf_counter() - started)
     return pipe, residency, cache

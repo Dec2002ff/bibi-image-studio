@@ -118,7 +118,7 @@ def parse_response(text: str) -> BoostResult:
                 raw=text,
             )
 
-    LOGGER.warning("Ответ переписывателя — не JSON, беру текст как есть")
+    LOGGER.warning("Rewriter response is not JSON; using the text as is")
     return BoostResult(prompt=raw, raw=text)
 
 
@@ -168,7 +168,7 @@ def _read_system_prompt(prompt_dir: Path, filename: str) -> str:
     try:
         return path.read_text(encoding="utf-8")
     except OSError as error:
-        raise FileNotFoundError(f"Не найден системный промт {path}: {error}") from error
+        raise FileNotFoundError(f"System prompt not found {path}: {error}") from error
 
 
 def boost(
@@ -204,7 +204,7 @@ def boost(
         try:
             return _ask(client, system, user, prompt, images)
         except LlmImagesRejected as error:
-            LOGGER.warning("Языковая модель не приняла изображения, переписываю по тексту: %s", error)
+            LOGGER.warning("Language model rejected the images, rewriting from text only: %s", error)
     if not images:
         return _ask(client, system, user, prompt)
     # Изображения были, но переписыватель их не увидит — и узнаёт об этом.
@@ -227,13 +227,13 @@ def _ask(
     """
     result = parse_response(client.complete(system, user, images=images))
     if not result.prompt:
-        LOGGER.warning("Переписыватель вернул пустой промт, спрашиваю ещё раз")
+        LOGGER.warning("Rewriter returned an empty prompt, retrying")
         result = parse_response(client.complete(system, user, images=images))
     elif off_language(instruction, result.prompt):
-        LOGGER.warning("Переписанный промт пришёл не по-английски, спрашиваю ещё раз")
+        LOGGER.warning("Rewritten prompt is not in English, retrying")
         result = parse_response(client.complete(system, user, images=images))
     if not result.prompt:
-        LOGGER.warning("Переписыватель снова вернул пустой промт, оставляю исходный")
+        LOGGER.warning("Rewriter returned an empty prompt again, keeping the original")
         return replace(result, prompt=instruction)
     return result
 

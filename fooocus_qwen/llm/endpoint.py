@@ -107,7 +107,7 @@ def parse_endpoint_file(text: str, default_port: int = 8000) -> LlmEndpoint:
         candidates.append(ambiguous[0])
 
     if not candidates:
-        raise ValueError("В файле адреса языковой модели не найдено ни одного хоста")
+        raise ValueError("No host found in the language model address file")
 
     return LlmEndpoint(base_url=_normalize(candidates[0], default_port), token=token, backend=backend)
 

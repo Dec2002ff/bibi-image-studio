@@ -27,13 +27,13 @@ def test_the_parser_knows_both_flags():
 def test_fetch_model_reports_that_weights_were_already_there(monkeypatch, capsys):
     monkeypatch.setattr("fooocus_qwen.engine.fetch.ensure_model", lambda *_a, **_k: False)
     assert entry.main(["--fetch-model"]) == 0
-    assert "на месте" in capsys.readouterr().out.lower()
+    assert "weights found" in capsys.readouterr().out.lower()
 
 
 def test_fetch_model_reports_a_download(monkeypatch, capsys):
     monkeypatch.setattr("fooocus_qwen.engine.fetch.ensure_model", lambda *_a, **_k: True)
     assert entry.main(["--fetch-model"]) == 0
-    assert "скачан" in capsys.readouterr().out.lower()
+    assert "downloaded" in capsys.readouterr().out.lower()
 
 
 def test_a_failed_download_is_a_non_zero_exit(monkeypatch, capsys):
@@ -68,7 +68,7 @@ def test_setup_llm_is_skipped_without_a_console(monkeypatch, capsys):
 
     assert entry.main(["--setup-llm"]) == 0
     assert not asked, "без консоли спрашивать нельзя"
-    assert "пропус" in capsys.readouterr().out.lower()
+    assert "skipping" in capsys.readouterr().out.lower()
 
 
 def test_a_refused_llm_setup_is_still_a_success(monkeypatch):

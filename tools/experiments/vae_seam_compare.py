@@ -59,7 +59,7 @@ def chroma_lines(array: np.ndarray, stride: int) -> dict:
 
 @torch.no_grad()
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Швы тайлового декодера VAE")
+    parser = argparse.ArgumentParser(description="Seams of the tiled VAE decoder")
     parser.add_argument("--source", type=Path, default=SOURCE)
     parser.add_argument("--tile", type=int, default=512)
     parser.add_argument("--stride", type=int, default=256)
@@ -67,7 +67,7 @@ def main() -> int:
 
     from diffusers import AutoencoderKLQwenImage21
 
-    print("гружу VAE…", flush=True)
+    print("loading VAE…", flush=True)
     vae = AutoencoderKLQwenImage21.from_pretrained(
         config.MODEL_DIR, subfolder="vae", torch_dtype=torch.bfloat16
     ).to("cuda")
@@ -79,7 +79,7 @@ def main() -> int:
     x = torch.from_numpy(np.concatenate([array, opaque], axis=2))
     x = x.permute(2, 0, 1)[None, :, None].to("cuda", torch.bfloat16)
 
-    print(f"кодирую {image.width}x{image.height} без тайлинга…", flush=True)
+    print(f"encoding {image.width}x{image.height} without tiling…", flush=True)
     vae.disable_tiling()
     latent = vae.encode(x).latent_dist.mode()
 
@@ -98,22 +98,22 @@ def main() -> int:
         out = decoded.float().clamp(-1, 1)[0].permute(1, 2, 0).cpu().numpy()[..., :3]
         results[name] = (out + 1.0) * 127.5
 
-    print("декодирую целиком (эталон)…", flush=True)
-    run("целиком")
+    print("decoding whole (reference)…", flush=True)
+    run("whole")
 
-    print("декодирую штатным тайлингом diffusers…", flush=True)
+    print("decoding with the stock diffusers tiling…", flush=True)
     vae.enable_tiling(tile_sample_min_height=args.tile, tile_sample_min_width=args.tile)
     vae.tile_sample_stride_height = args.stride
     vae.tile_sample_stride_width = args.stride
     run("diffusers")
 
-    print("декодирую здешним тайлингом…", flush=True)
+    print("decoding with our tiling…", flush=True)
     vae_tiling.install(vae)
-    run("здешний")
+    run("ours")
 
-    reference = results["целиком"]
-    print(f"\n{'вариант':12} {'расхожд. с целым':>17} {'макс.':>7} {'швов':>5} {'линий':>6} {'с':>6} {'ГиБ':>6}")
-    for name in ("целиком", "diffusers", "здешний"):
+    reference = results["whole"]
+    print(f"\n{'variant':12} {'diff vs whole':>17} {'max':>7} {'seams':>5} {'lines':>6} {'s':>6} {'GiB':>6}")
+    for name in ("whole", "diffusers", "ours"):
         delta = np.abs(results[name] - reference)
         stats = chroma_lines(results[name], args.stride)
         print(
@@ -121,7 +121,7 @@ def main() -> int:
             f"{stats['on_grid']:5d} {stats['lines']:6d} {timings[name]:6.2f} {peaks[name]:6.2f}"
         )
         if stats["on_grid"]:
-            print(f"             швы на x = {stats['positions']}")
+            print(f"             seams at x = {stats['positions']}")
     return 0
 
 

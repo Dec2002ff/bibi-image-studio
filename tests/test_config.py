@@ -8,7 +8,7 @@ def test_defaults_listen_on_all_interfaces():
     cfg = config.parse_args([])
     assert cfg.host == "0.0.0.0"
     assert cfg.port == 7865
-    assert cfg.lang == "ru"
+    assert cfg.lang == "en", "интерфейс по умолчанию — английский"
     assert cfg.pin_memory is True
     assert cfg.preset == "MiddleQuality"
 

@@ -113,24 +113,24 @@ def levers(pipe) -> list[tuple[str, object]]:
         return apply
 
     return [
-        ("отправная точка", lambda _p: None),
+        ("baseline", lambda _p: None),
         ("cudnn.benchmark", flag(**{"cudnn.benchmark": True})),
-        ("tf32 в matmul", flag(**{"cuda.matmul.allow_tf32": True})),
-        ("внимание _native_flash", attention("_native_flash")),
-        ("внимание _native_efficient", attention("_native_efficient")),
-        ("внимание _native_cudnn", attention("_native_cudnn")),
-        ("плитка VAE 1024/512", tiling(1024, 512)),
-        ("плитка VAE 768/384", tiling(768, 384)),
+        ("tf32 in matmul", flag(**{"cuda.matmul.allow_tf32": True})),
+        ("attention _native_flash", attention("_native_flash")),
+        ("attention _native_efficient", attention("_native_efficient")),
+        ("attention _native_cudnn", attention("_native_cudnn")),
+        ("VAE tile 1024/512", tiling(1024, 512)),
+        ("VAE tile 768/384", tiling(768, 384)),
     ]
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Рычаги скорости по одному")
+    parser = argparse.ArgumentParser(description="Speed levers one at a time")
     parser.add_argument("--steps", type=int, default=6)
-    parser.add_argument("--repeat", type=int, default=2, help="первый прогон прогревочный")
+    parser.add_argument("--repeat", type=int, default=2, help="the first run is a warm-up")
     parser.add_argument("--resolution", type=int, default=1536)
     parser.add_argument("--with-source", action="store_true",
-                        help="добавить условное изображение: у правки последовательность вдвое длиннее")
+                        help="add a condition image: an edit has a sequence twice as long")
     args = parser.parse_args()
 
     logging_setup.setup_logging(False)
@@ -172,23 +172,23 @@ def main() -> int:
                 decode_times.append(decode_spent)
 
         rows[name] = {
-            "секунд_на_шаг": round(min(denoise_times) / args.steps, 3),
-            "декодирование_с": round(min(decode_times), 2),
-            "пик_гиб": round(torch.cuda.max_memory_allocated() / 2**30, 2),
+            "seconds_per_step": round(min(denoise_times) / args.steps, 3),
+            "decode_s": round(min(decode_times), 2),
+            "peak_gib": round(torch.cuda.max_memory_allocated() / 2**30, 2),
         }
         print(f"{name}: {rows[name]}", flush=True)
         (OUT / "scores.json").write_text(
             json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    base = rows["отправная точка"]
-    print("\n=== сводка (минимум из установившихся прогонов) ===")
-    print(f"{'рычаг':>28} | {'с/шаг':>6} | {'выигрыш':>8} | {'декод, с':>8} | "
-          f"{'выигрыш':>8} | {'пик ГиБ':>7}")
+    base = rows["baseline"]
+    print("\n=== summary (minimum over steady-state runs) ===")
+    print(f"{'lever':>28} | {'s/step':>6} | {'gain':>8} | {'decode, s':>9} | "
+          f"{'gain':>8} | {'peak GiB':>8}")
     for name, row in rows.items():
-        step_gain = 100 * (base["секунд_на_шаг"] - row["секунд_на_шаг"]) / base["секунд_на_шаг"]
-        decode_gain = 100 * (base["декодирование_с"] - row["декодирование_с"]) / base["декодирование_с"]
-        print(f"{name:>28} | {row['секунд_на_шаг']:>6} | {step_gain:>7.1f}% | "
-              f"{row['декодирование_с']:>8} | {decode_gain:>7.1f}% | {row['пик_гиб']:>7}")
+        step_gain = 100 * (base["seconds_per_step"] - row["seconds_per_step"]) / base["seconds_per_step"]
+        decode_gain = 100 * (base["decode_s"] - row["decode_s"]) / base["decode_s"]
+        print(f"{name:>28} | {row['seconds_per_step']:>6} | {step_gain:>7.1f}% | "
+              f"{row['decode_s']:>9} | {decode_gain:>7.1f}% | {row['peak_gib']:>8}")
     print(f"\njson: {OUT / 'scores.json'}")
     return 0
 

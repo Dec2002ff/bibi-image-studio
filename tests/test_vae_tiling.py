@@ -144,7 +144,7 @@ def test_every_pixel_is_covered_by_at_least_one_tile():
 def test_trim_that_would_leave_holes_is_refused():
     """Обрезка шире перекрытия оставила бы незакрытые полосы — это ошибка."""
     latent = _coordinates(80, 80)
-    with pytest.raises(ValueError, match="обрез"):
+    with pytest.raises(ValueError, match="exceeds tile overlap"):
         vae_tiling.decode_tiled(
             latent,
             _honest_decode,

@@ -59,9 +59,9 @@ def _check_header_safe(value: str, description: str) -> None:
         value.encode("latin-1")
     except UnicodeEncodeError as error:
         raise LlmError(
-            f"{description} содержит символы, которые нельзя передать в HTTP-заголовке "
-            "(допустимы только латиница, цифры и стандартная пунктуация). "
-            "Замените его на настоящее значение в llm_endpoint.txt."
+            f"{description} contains characters that cannot be sent in an HTTP header "
+            "(only Latin letters, digits and standard punctuation are allowed). "
+            "Replace it with the real value in llm_endpoint.txt."
         ) from error
 
 
@@ -97,9 +97,9 @@ def _vision_hint(images: list[Image.Image] | None, error: Exception) -> str:
     if not _images_rejected(images, error):
         return ""
     return (
-        ". Запрос содержал изображение — возможно, выбранная модель не умеет их"
-        " читать. Зрение нужно только кнопке «Описать изображение»; AI буст с"
-        " текстовой моделью переписывает промт по тексту."
+        ". The request contained an image; the selected model may not be able to"
+        " read images. Vision is only needed for the Describe image button; AI boost with"
+        " a text-only model rewrites the prompt from text."
     )
 
 
@@ -122,7 +122,7 @@ class LlmClient:
     def _headers(self) -> dict[str, str]:
         headers = {"Content-Type": "application/json; charset=utf-8"}
         if self._endpoint.token:
-            _check_header_safe(self._endpoint.token, "Токен доступа")
+            _check_header_safe(self._endpoint.token, "Access token")
             headers["Authorization"] = f"Bearer {self._endpoint.token}"
         return headers
 
@@ -133,7 +133,7 @@ class LlmClient:
             with urllib.request.urlopen(request, timeout=min(self._timeout, 15)) as response:
                 payload = json.loads(response.read().decode("utf-8"))
         except (urllib.error.URLError, OSError, json.JSONDecodeError, UnicodeError) as error:
-            raise LlmError(f"Сервер языковой модели недоступен: {error}") from error
+            raise LlmError(f"Language model server is unreachable: {error}") from error
         return [item.get("id", "") for item in payload.get("data", [])]
 
     def _build_body(
@@ -180,15 +180,15 @@ class LlmClient:
                 payload = json.loads(response.read().decode("utf-8"))
         except (urllib.error.URLError, OSError, json.JSONDecodeError, UnicodeError) as error:
             kind = LlmImagesRejected if _images_rejected(images, error) else LlmError
-            raise kind(f"Ошибка обращения к языковой модели: {error}{_vision_hint(images, error)}") from error
+            raise kind(f"Language model request failed: {error}{_vision_hint(images, error)}") from error
 
         choices = payload.get("choices") or []
         if not choices:
-            raise LlmError("Языковая модель вернула пустой ответ")
+            raise LlmError("Language model returned an empty response")
 
         message = choices[0].get("message") or {}
         text = (message.get("content") or "").strip()
         if not text:
             # reasoning_content игнорируем намеренно: это внутренние рассуждения.
-            raise LlmError("Языковая модель вернула ответ без текста")
+            raise LlmError("Language model returned a response without text")
         return text

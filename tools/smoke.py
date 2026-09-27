@@ -88,43 +88,43 @@ def opaque_share(image: Image.Image, where: np.ndarray | None = None) -> float:
 
 
 def scenario_presets(engine: Generator) -> None:
-    print("\n== пункты 3-4: три пресета и читаемость текста ==")
+    print("\n== items 3-4: three presets and text legibility ==")
     prompt = 'a neon shop sign that reads "QWEN", rainy night, reflections on wet pavement'
     for name in presets.NAMES:
         started = time.perf_counter()
         image = one(engine, prompt=prompt, preset=presets.get(name), seed=42)
         elapsed = time.perf_counter() - started
         if image is None:
-            record(f"пресет {name}", "ПРОВАЛ", "генерация не вернула изображение")
+            record(f"preset {name}", "FAIL", "generation returned no image")
             continue
         path = save(image, f"preset-{name}")
-        record(f"пресет {name}", "ок", f"{image.size[0]}x{image.size[1]}, {elapsed:.1f} с -> {path.name}")
+        record(f"preset {name}", "ok", f"{image.size[0]}x{image.size[1]}, {elapsed:.1f} s -> {path.name}")
 
 
 def scenario_transparent(engine: Generator) -> None:
-    print("\n== пункт 5: прозрачный RGBA ==")
+    print("\n== item 5: transparent RGBA ==")
     prompt = (
         "This is an RGBA image with transparency. A cute cartoon dragon sticker. "
         "The image has alpha channel and the background is transparent."
     )
     image = one(engine, prompt=prompt, preset=presets.get("LowQuality"), seed=7)
     if image is None:
-        record("прозрачный RGBA", "ПРОВАЛ", "нет изображения")
+        record("transparent RGBA", "FAIL", "no image")
         return
     path = save(image, "transparent")
     array = np.asarray(image.convert("RGBA"))
     alpha = array[..., 3]
     transparent_share = float((alpha < 16).mean())
-    verdict = "ок" if transparent_share > 0.05 else "ПРОВАЛ"
+    verdict = "ok" if transparent_share > 0.05 else "FAIL"
     record(
-        "прозрачный RGBA",
+        "transparent RGBA",
         verdict,
-        f"режим {image.mode}, прозрачных пикселей {transparent_share:.0%} -> {path.name}",
+        f"mode {image.mode}, transparent pixels {transparent_share:.0%} -> {path.name}",
     )
 
 
 def scenario_aspects(engine: Generator) -> None:
-    print("\n== пункт 6: семь соотношений сторон ==")
+    print("\n== item 6: seven aspect ratios ==")
     for ratio in aspect.ASPECT_RATIOS:
         if ratio == aspect.FOLLOW_REFERENCE:
             continue
@@ -137,10 +137,10 @@ def scenario_aspects(engine: Generator) -> None:
             seed=11,
         )
         if image is None:
-            record(f"соотношение {ratio}", "ПРОВАЛ", "нет изображения")
+            record(f"ratio {ratio}", "FAIL", "no image")
             continue
-        verdict = "ок" if image.size == expected else "ПРОВАЛ"
-        record(f"соотношение {ratio}", verdict, f"получено {image.size}, ожидалось {expected}")
+        verdict = "ok" if image.size == expected else "FAIL"
+        record(f"ratio {ratio}", verdict, f"got {image.size}, expected {expected}")
 
 
 def make_source(engine: Generator) -> Image.Image:
@@ -151,13 +151,13 @@ def make_source(engine: Generator) -> Image.Image:
         preset=presets.get("LowQuality"),
         seed=5,
     )
-    assert image is not None, "не удалось сгенерировать исходный кадр"
+    assert image is not None, "failed to generate the source frame"
     save(image, "source")
     return image
 
 
 def scenario_edit_plain(engine: Generator, source: Image.Image) -> None:
-    print("\n== пункт 7: правка промтом без маски ==")
+    print("\n== item 7: prompt edit without a mask ==")
     image = one(
         engine,
         prompt="change the background to a sunlit autumn park",
@@ -168,14 +168,14 @@ def scenario_edit_plain(engine: Generator, source: Image.Image) -> None:
         seed=21,
     )
     if image is None:
-        record("правка промтом", "ПРОВАЛ", "нет изображения")
+        record("prompt edit", "FAIL", "no image")
         return
     path = save(image, "edit-plain")
-    record("правка промтом", "ок", f"{image.size} -> {path.name} (оценить глазами)")
+    record("prompt edit", "ok", f"{image.size} -> {path.name} (check by eye)")
 
 
 def scenario_edit_mask(engine: Generator, source: Image.Image) -> None:
-    print("\n== пункт 8: правка по маске и сохранность пикселей ==")
+    print("\n== item 8: masked edit and pixel preservation ==")
     width, height = source.size
     mask = Image.new("L", source.size, 0)
     ImageDraw.Draw(mask).ellipse(
@@ -195,7 +195,7 @@ def scenario_edit_mask(engine: Generator, source: Image.Image) -> None:
         seed=33,
     )
     if image is None:
-        record("правка по маске", "ПРОВАЛ", "нет изображения")
+        record("masked edit", "FAIL", "no image")
         return
     path = save(image, "edit-mask")
 
@@ -206,9 +206,9 @@ def scenario_edit_mask(engine: Generator, source: Image.Image) -> None:
     identical = bool(np.array_equal(after[outside], before[outside]))
     changed_share = float((after != before).any(axis=2).mean())
     record(
-        "пиксели вне маски побайтово целы",
-        "ок" if identical else "ПРОВАЛ",
-        f"изменено {changed_share:.1%} кадра -> {path.name}",
+        "pixels outside the mask are byte-identical",
+        "ok" if identical else "FAIL",
+        f"changed {changed_share:.1%} of the frame -> {path.name}",
     )
     # Исходник непрозрачен, значит и правка обязана остаться непрозрачной.
     # Без этой проверки прозрачность, которую модель принимает за смысл маски,
@@ -216,14 +216,14 @@ def scenario_edit_mask(engine: Generator, source: Image.Image) -> None:
     inside = np.asarray(refined) > 0
     opaque = opaque_share(image, inside)
     record(
-        "правка по маске осталась непрозрачной",
-        "ок" if opaque >= 99.0 else "ПРОВАЛ",
-        f"непрозрачно внутри маски {opaque:.1f} %",
+        "masked edit stayed opaque",
+        "ok" if opaque >= 99.0 else "FAIL",
+        f"opaque inside the mask {opaque:.1f} %",
     )
 
 
 def scenario_annotation(engine: Generator, source: Image.Image) -> None:
-    print("\n== пункт 9: аннотация, две области двумя цветами ==")
+    print("\n== item 9: annotation, two areas in two colours ==")
     width, height = source.size
     annotated = source.convert("RGBA").copy()
     draw = ImageDraw.Draw(annotated)
@@ -252,14 +252,14 @@ def scenario_annotation(engine: Generator, source: Image.Image) -> None:
         seed=44,
     )
     if image is None:
-        record("аннотация", "ПРОВАЛ", "нет изображения")
+        record("annotation", "FAIL", "no image")
         return
     path = save(image, "annotation")
-    record("аннотация", "ок", f"{image.size} -> {path.name} (оценить глазами: обе области и нет кругов)")
+    record("annotation", "ok", f"{image.size} -> {path.name} (check by eye: both areas, no circles)")
 
 
 def scenario_region(engine: Generator, source: Image.Image) -> None:
-    print("\n== пункт 10: точная область на мелкой детали ==")
+    print("\n== item 10: precise region on a small detail ==")
     width, height = source.size
     # Область и просьба обязаны совпадать. В первой редакции маска лежала на
     # лбу (y от 0.22 до 0.34), а промт просил серьги — уши совсем в другом
@@ -282,7 +282,7 @@ def scenario_region(engine: Generator, source: Image.Image) -> None:
         seed=55,
     )
     if image is None:
-        record("точная область", "ПРОВАЛ", "нет изображения")
+        record("precise region", "FAIL", "no image")
         return
     path = save(image, "region")
     # Совпадения размера мало: при неудачно поставленной маске кадр вернётся
@@ -297,15 +297,15 @@ def scenario_region(engine: Generator, source: Image.Image) -> None:
     changed_outside = float(delta[~inside].max())
     good = image.size == source.size and changed_inside > 1.0 and changed_outside == 0.0
     record(
-        "точная область",
-        "ок" if good else "ПРОВАЛ",
-        f"размер {image.size}, среднее изменение внутри {changed_inside:.1f}, "
-        f"максимум снаружи {changed_outside:.1f} -> {path.name}",
+        "precise region",
+        "ok" if good else "FAIL",
+        f"size {image.size}, mean change inside {changed_inside:.1f}, "
+        f"max outside {changed_outside:.1f} -> {path.name}",
     )
 
 
 def scenario_outpaint(engine: Generator, source: Image.Image) -> None:
-    print("\n== пункт 11: расширение холста ==")
+    print("\n== item 11: outpaint ==")
     for sides, tag in ((["right"], "right"), (["top"], "top"), (["left", "bottom"], "left-bottom")):
         plan = outpaint.plan(source.size, sides, 0.35)
         canvas, mask = outpaint.expand(source, plan)
@@ -332,7 +332,7 @@ def scenario_outpaint(engine: Generator, source: Image.Image) -> None:
             seed=66,
         )
         if image is None:
-            record(f"расширение {tag}", "ПРОВАЛ", "нет изображения")
+            record(f"outpaint {tag}", "FAIL", "no image")
             continue
         path = save(image, f"outpaint-{tag}")
         grew = image.size == plan.canvas_size
@@ -340,15 +340,15 @@ def scenario_outpaint(engine: Generator, source: Image.Image) -> None:
         opaque = opaque_share(image, new_area)
         good = grew and opaque >= 99.0
         record(
-            f"расширение {tag}",
-            "ок" if good else "ПРОВАЛ",
-            f"{source.size} -> {image.size}, непрозрачно в новой площади {opaque:.1f} % "
+            f"outpaint {tag}",
+            "ok" if good else "FAIL",
+            f"{source.size} -> {image.size}, opaque in the new area {opaque:.1f} % "
             f"-> {path.name}",
         )
 
 
 def scenario_references(engine: Generator) -> None:
-    print("\n== пункты 12-13: десять референсов и один ==")
+    print("\n== items 12-13: ten references and one ==")
     palette = [(200, 60, 60), (60, 160, 90), (70, 90, 200), (210, 170, 60), (150, 80, 180),
                (80, 180, 190), (230, 120, 70), (110, 110, 110), (180, 60, 140), (60, 200, 130)]
     refs = tuple(Image.new("RGB", (768, 768), colour) for colour in palette)
@@ -366,9 +366,9 @@ def scenario_references(engine: Generator) -> None:
     )
     chosen = resolve_reference_scale(request)
     record(
-        "масштаб референсов урезан автоматически",
-        "ок" if chosen < middle.output_resolution else "ПРОВАЛ",
-        f"{middle.output_resolution} -> {chosen} при десяти референсах",
+        "reference scale reduced automatically",
+        "ok" if chosen < middle.output_resolution else "FAIL",
+        f"{middle.output_resolution} -> {chosen} with ten references",
     )
 
     try:
@@ -378,7 +378,7 @@ def scenario_references(engine: Generator) -> None:
         elapsed = time.perf_counter() - started
     except torch.cuda.OutOfMemoryError:
         torch.cuda.empty_cache()
-        record("десять референсов", "ПРОВАЛ", "нехватка видеопамяти")
+        record("ten references", "FAIL", "out of video memory")
         image = None
     if image is not None:
         path = save(image, "references-10")
@@ -387,9 +387,9 @@ def scenario_references(engine: Generator) -> None:
         width, height = aspect.dimensions("1:1", middle.output_resolution)
         good = image.size == (width, height)
         record(
-            "десять референсов",
-            "ок" if good else "ПРОВАЛ",
-            f"{image.size} (кадр пресета {width}x{height}), {elapsed:.1f} с -> {path.name}",
+            "ten references",
+            "ok" if good else "FAIL",
+            f"{image.size} (preset frame {width}x{height}), {elapsed:.1f} s -> {path.name}",
         )
 
     single = one(
@@ -400,14 +400,14 @@ def scenario_references(engine: Generator) -> None:
         seed=88,
     )
     if single is None:
-        record("один референс", "ПРОВАЛ", "нет изображения")
+        record("one reference", "FAIL", "no image")
     else:
         path = save(single, "references-1")
-        record("один референс", "ок", f"{single.size} -> {path.name}")
+        record("one reference", "ok", f"{single.size} -> {path.name}")
 
 
 def scenario_interrupt(engine: Generator) -> None:
-    print("\n== пункт 18: прерывание генерации ==")
+    print("\n== item 18: generation interrupt ==")
     stopper = threading.Timer(6.0, engine.interrupt)
     stopper.start()
     started = time.perf_counter()
@@ -422,14 +422,14 @@ def scenario_interrupt(engine: Generator) -> None:
     elapsed = time.perf_counter() - started
     stopper.cancel()
     record(
-        "прерывание",
-        "ок" if not produced else "ПРОВАЛ",
-        f"вернулось изображений: {len(produced)} за {elapsed:.1f} с (ожидался пустой список)",
+        "interrupt",
+        "ok" if not produced else "FAIL",
+        f"images returned: {len(produced)} in {elapsed:.1f} s (an empty list was expected)",
     )
 
 
 def scenario_swaps(engine: Generator, residency) -> None:
-    print("\n== пункт 20: повтор промта не поднимает энкодер ==")
+    print("\n== item 20: repeating a prompt does not load the encoder ==")
     request = GenerationRequest(
         prompt="a single red apple on a white plate", preset=presets.get("LowQuality"), seed=1
     )
@@ -439,30 +439,30 @@ def scenario_swaps(engine: Generator, residency) -> None:
     engine.generate(request)
     second = residency.stats()["swaps"]
     record(
-        "повтор промта без перестановки",
-        "ок" if second == first else "ПРОВАЛ",
-        f"перестановок {first:.0f} -> {second:.0f}",
+        "prompt repeat without a swap",
+        "ok" if second == first else "FAIL",
+        f"swaps {first:.0f} -> {second:.0f}",
     )
 
 
 def scenario_metadata(engine: Generator) -> None:
-    print("\n== пункт 17: параметры восстанавливаются из PNG ==")
+    print("\n== item 17: parameters are restored from PNG ==")
     produced = engine.generate(
         GenerationRequest(
             prompt="a bowl of cherries", preset=presets.get("LowQuality"), aspect="3:2", seed=123
         )
     )
     if not produced:
-        record("метаданные PNG", "ПРОВАЛ", "нет изображения")
+        record("PNG metadata", "FAIL", "no image")
         return
     item = produced[0]
     path = metadata.save_png(item.image, OUT / "metadata.png", item.parameters)
     read_back = metadata.read_png(path)
     ok = read_back == item.parameters and read_back.get("seed") == 123 and read_back.get("aspect") == "3:2"
     record(
-        "метаданные PNG",
-        "ок" if ok else "ПРОВАЛ",
-        f"сид {read_back.get('seed')}, соотношение {read_back.get('aspect')}, ключей {len(read_back)}",
+        "PNG metadata",
+        "ok" if ok else "FAIL",
+        f"seed {read_back.get('seed')}, ratio {read_back.get('aspect')}, keys {len(read_back)}",
     )
 
 
@@ -483,8 +483,8 @@ SCENARIOS = {
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Дымовой прогон сценариев с генерацией")
-    parser.add_argument("--only", nargs="*", default=None, help="выполнить только названные сценарии")
+    parser = argparse.ArgumentParser(description="Smoke run of the scenarios that need generation")
+    parser.add_argument("--only", nargs="*", default=None, help="run only the named scenarios")
     args = parser.parse_args()
     chosen = set(args.only) if args.only else None
 
@@ -496,7 +496,7 @@ def main() -> int:
 
     started = time.perf_counter()
     pipe, residency, cache = loader.load(config.MODEL_DIR)
-    print(f"модель готова за {time.perf_counter() - started:.1f} с", flush=True)
+    print(f"model ready in {time.perf_counter() - started:.1f} s", flush=True)
     engine = Generator(pipe, residency, cache, load_styles(config.STYLES_DIR))
 
     if wanted("presets"):
@@ -529,13 +529,13 @@ def main() -> int:
     if wanted("interrupt"):
         scenario_interrupt(engine)
 
-    print("\n=== СВОДКА ===")
-    failed = [row for row in RESULTS if row[1] != "ок"]
+    print("\n=== SUMMARY ===")
+    failed = [row for row in RESULTS if row[1] != "ok"]
     for point, verdict, note in RESULTS:
         print(f"{verdict:6s} | {point} | {note}")
-    print(f"\nвсего {len(RESULTS)}, провалов {len(failed)}")
-    print(f"изображения: {OUT}")
-    print(f"кэш: {cache.hits} попаданий / {cache.misses} промахов; {residency.stats()}")
+    print(f"\ntotal {len(RESULTS)}, failed {len(failed)}")
+    print(f"images: {OUT}")
+    print(f"cache: {cache.hits} hits / {cache.misses} misses; {residency.stats()}")
     return 1 if failed else 0
 
 

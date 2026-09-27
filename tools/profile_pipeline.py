@@ -115,37 +115,37 @@ def instrument(recorder: Recorder, pipe, engine) -> None:
     from fooocus_qwen.engine import generator as gen
     from fooocus_qwen.imaging import masking, metadata
 
-    recorder.wrap(engine, "_prepare", "подготовка/маска и вырезка")
-    recorder.wrap(engine, "_finish", "склейка результата")
-    recorder.wrap(gen, "apply_styles", "подготовка/стили")
-    recorder.wrap(gen, "build_conditions", "подготовка/условные изображения")
-    recorder.wrap(masking, "refine", "подготовка/refine маски")
-    recorder.wrap(masking, "as_condition", "подготовка/маска в условное")
-    recorder.wrap(masking, "blend", "склейка/blend")
-    recorder.wrap(masking, "stitch", "склейка/stitch")
-    recorder.wrap(masking, "paste_region", "склейка/paste_region")
-    recorder.wrap(masking, "clipped_share", "склейка/доля обрезанного")
-    recorder.wrap(metadata, "save_png", "запись PNG")
+    recorder.wrap(engine, "_prepare", "prepare/mask and crop")
+    recorder.wrap(engine, "_finish", "result compositing")
+    recorder.wrap(gen, "apply_styles", "prepare/styles")
+    recorder.wrap(gen, "build_conditions", "prepare/condition images")
+    recorder.wrap(masking, "refine", "prepare/mask refine")
+    recorder.wrap(masking, "as_condition", "prepare/mask to condition")
+    recorder.wrap(masking, "blend", "composite/blend")
+    recorder.wrap(masking, "stitch", "composite/stitch")
+    recorder.wrap(masking, "paste_region", "composite/paste_region")
+    recorder.wrap(masking, "clipped_share", "composite/clipped share")
+    recorder.wrap(metadata, "save_png", "PNG write")
 
     cache = getattr(pipe, "_studio_cache", None)
     if cache is not None:
-        recorder.wrap(cache, "key", "кодирование/ключ кэша (хеш картинок)")
+        recorder.wrap(cache, "key", "encode/cache key (image hash)")
     residency = getattr(pipe, "_studio_residency", None)
     if residency is not None:
         for attribute in ("_transformer", "_text_encoder"):
             staged = getattr(residency, attribute, None)
             if staged is not None:
-                short = "трансформер" if "transformer" in attribute else "энкодер"
-                recorder.wrap(staged, "to_host", f"перестановка/{short} на хост")
-                recorder.wrap(staged, "to_device", f"перестановка/{short} на карту")
+                short = "transformer" if "transformer" in attribute else "encoder"
+                recorder.wrap(staged, "to_host", f"swap/{short} to host")
+                recorder.wrap(staged, "to_device", f"swap/{short} to GPU")
 
-    recorder.wrap(pipe, "_get_qwen_prompt_embeds", "кодирование промта")
-    recorder.wrap(pipe.transformer, "forward", "денойзинг/шаг трансформера")
-    recorder.wrap(pipe.vae, "encode", "VAE/кодирование условных")
-    recorder.wrap(pipe.vae, "decode", "VAE/декодирование кадра")
-    recorder.wrap(pipe.image_processor, "preprocess", "подготовка/preprocess условных")
-    recorder.wrap(pipe.image_processor, "resize", "подготовка/resize условных")
-    recorder.wrap(pipe.image_processor, "postprocess", "постобработка в PIL")
+    recorder.wrap(pipe, "_get_qwen_prompt_embeds", "prompt encoding")
+    recorder.wrap(pipe.transformer, "forward", "denoise/transformer step")
+    recorder.wrap(pipe.vae, "encode", "VAE/encode conditions")
+    recorder.wrap(pipe.vae, "decode", "VAE/decode frame")
+    recorder.wrap(pipe.image_processor, "preprocess", "prepare/preprocess conditions")
+    recorder.wrap(pipe.image_processor, "resize", "prepare/resize conditions")
+    recorder.wrap(pipe.image_processor, "postprocess", "postprocess to PIL")
 
 
 def unwrap(pipe, engine) -> None:
@@ -202,18 +202,18 @@ def scenario_request(kind: str, preset_name: str, source_path: Path):
             aspect=aspect.FOLLOW_REFERENCE, source=source, mask=mask,
             mask_mode=MASK_MASK, keep_outside=True, seed=7,
         )
-    raise ValueError(f"неизвестный сценарий: {kind}")
+    raise ValueError(f"unknown scenario: {kind}")
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Граф прохождения со временем узлов")
+    parser = argparse.ArgumentParser(description="Request path graph with per-node timing")
     parser.add_argument("--scenario", choices=("t2i", "edit", "mask"), default="t2i")
     parser.add_argument("--preset", default="MiddleQuality")
     parser.add_argument("--steps", type=int, default=8,
-                        help="меньше шагов: доля денойзинга линейна по ним, "
-                             "а остальные узлы от числа шагов не зависят")
+                        help="fewer steps: the denoising share is linear in them, "
+                             "while the other nodes do not depend on the step count")
     parser.add_argument("--repeat", type=int, default=2,
-                        help="первый прогон несёт разовую перестановку весов и прогрев ядер")
+                        help="the first run carries the one-off weight swap and kernel warm-up")
     parser.add_argument("--source", type=str, default=None)
     args = parser.parse_args()
 
@@ -243,10 +243,10 @@ def main() -> int:
         instrument(recorder, pipe, engine)
         request.seed = 100 + attempt
 
-        with recorder.node("ВСЁ"):
+        with recorder.node("ALL"):
             produced = engine.generate(request)
             if produced:
-                with recorder.node("запись PNG"):
+                with recorder.node("PNG write"):
                     destination = gallery.next_path(OUT)
                     metadata.save_png(produced[0].image, destination, produced[0].parameters)
 
@@ -260,17 +260,17 @@ def main() -> int:
                     "model_load_s": round(load_seconds, 1)},
                    ensure_ascii=False, indent=2), encoding="utf-8")
 
-    whole = next((row["total_s"] for row in final if row["node"] == "ВСЁ"), 0.0) or 1.0
-    print(f"\n=== {name}: установившийся прогон, всего {whole:.1f} с ===")
-    print(f"{'узел':>42} | {'всего, с':>8} | {'своё, с':>7} | {'раз':>4} | "
-          f"{'на заход, мс':>12} | доля")
+    whole = next((row["total_s"] for row in final if row["node"] == "ALL"), 0.0) or 1.0
+    print(f"\n=== {name}: steady-state run, {whole:.1f} s in total ===")
+    print(f"{'node':>42} | {'total, s':>8} | {'self, s':>7} | {'runs':>4} | "
+          f"{'per run, ms':>12} | share")
     for row in final:
-        if row["node"] == "ВСЁ":
+        if row["node"] == "ALL":
             continue
         print(f"{row['node']:>42} | {row['total_s']:>8} | {row['own_s']:>7} | "
               f"{row['calls']:>4} | {row['per_call_ms']:>12} | "
               f"{100 * row['own_s'] / whole:5.1f}%")
-    print(f"\nзагрузка модели (разово): {load_seconds:.1f} с")
+    print(f"\nmodel load (one-off): {load_seconds:.1f} s")
     print(f"json: {OUT / (name + '.json')}")
     return 0
 

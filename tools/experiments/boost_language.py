@@ -62,10 +62,10 @@ def sample_image() -> Image.Image:
 
 def main() -> int:
     use_utf8_console()
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--runs", type=int, default=4, help="повторов на инструкцию и вариант")
+    parser = argparse.ArgumentParser(description="Experiment: which language AI boost rewrites a Russian prompt into.")
+    parser.add_argument("--runs", type=int, default=4, help="repeats per instruction and variant")
     parser.add_argument("--note", default=None,
-                        help="текст пометки для варианта edit-blind вместо boost.BLIND_NOTE")
+                        help="note text for the edit-blind variant instead of boost.BLIND_NOTE")
     args = parser.parse_args()
     note = args.note if args.note is not None else boost.BLIND_NOTE
 
@@ -76,7 +76,7 @@ def main() -> int:
         for name in ("t2i", "edit")
     }
     image = sample_image()
-    print(f"модель: {client.model or '(без имени)'}\n")
+    print(f"model: {client.model or '(unnamed)'}\n")
 
     variants = {
         "t2i": ("t2i", lambda text: text, None),
@@ -92,7 +92,7 @@ def main() -> int:
                 try:
                     raw = client.complete(prompts[system], make(instruction), images=images)
                 except LlmImagesRejected:
-                    print(f"[{name}] модель не принимает изображения — вариант пропущен")
+                    print(f"[{name}] the model does not accept images; variant skipped")
                     break
                 answer = boost.parse_response(raw).prompt
                 row = totals[name]
@@ -102,11 +102,11 @@ def main() -> int:
                 row["ru"] += russian
                 print(f"[{name}] {instruction!r}: {'RU ' if russian else ''}\n    {answer[:140]!r}")
 
-    print("\nвариант     | ответов | кириллица вне кавычек | среднее, с")
+    print("\nvariant     | answers | Cyrillic outside quotes | mean, s")
     for name, row in totals.items():
         n = row["n"]
         if n:
-            print(f"{name:11} | {n:7} | {row['ru'] / n:21.0%} | {row['seconds'] / n:.1f}")
+            print(f"{name:11} | {n:7} | {row['ru'] / n:23.0%} | {row['seconds'] / n:.1f}")
     return 0
 
 

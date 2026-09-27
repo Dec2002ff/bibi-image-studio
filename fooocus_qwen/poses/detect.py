@@ -108,7 +108,7 @@ class PoseDetector:
         rgb = np.asarray(ImageOps.exif_transpose(image).convert("RGB"))
         boxes = find_people(detector, rgb)
         if len(boxes) == 0:
-            raise NoPersonFound("на фотографии не найден человек")
+            raise NoPersonFound("no person found in the photo")
         areas = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
         box = boxes[int(np.argmax(areas))]
         points, scores = estimate(estimator, rgb, box)
@@ -210,7 +210,7 @@ def to_pose(detection: Detection, canvas: int = skeleton.BASE_CANVAS, margin: fl
 
     seen = body[body[:, 2] > 0, :2]
     if len(seen) < 2:
-        raise NoPersonFound("поза не распознана: видно меньше двух точек тела")
+        raise NoPersonFound("pose not recognized: fewer than two body points visible")
     low, high = seen.min(0), seen.max(0)
     extent = max(float((high - low).max()), 1.0)
     factor = canvas * (1 - 2 * margin) / extent

@@ -332,7 +332,7 @@ class Generator:
             try:
                 self._residency.restore()
             except Exception:  # noqa: BLE001 — сбой восстановления не должен ронять приложение
-                LOGGER.exception("Не удалось вернуть веса на штатные места")
+                LOGGER.exception("Failed to restore weights to their home devices")
 
     def _generate(
         self,
@@ -345,7 +345,7 @@ class Generator:
         prepared, region_box = self._prepare(request)
         use_turbo = prepared.preset.turbo
         if use_turbo and self._turbo is None:
-            raise RuntimeError("Пресет Turbo недоступен: адаптер turbo не подключён")
+            raise RuntimeError("Turbo preset is unavailable: the turbo adapter is not attached")
         if self._turbo is not None:
             # Внутри замка генерации: адаптер и планировщик — общее состояние
             # пайплайна, и переключать их посреди чужого цикла нельзя.
@@ -392,7 +392,7 @@ class Generator:
 
             if self._interrupted:
                 # Прерванный цикл всё равно декодирует латенты, но это шум.
-                LOGGER.info("Генерация прервана пользователем")
+                LOGGER.info("Generation interrupted by the user")
                 break
 
             image, clipped = self._finish(request, prepared, output.images[0], region_box)
@@ -433,7 +433,7 @@ class Generator:
 
         box = masking.region_box(refined, padding=0.25)
         if box is None:
-            LOGGER.warning("Маска пуста, режим точной области вырождается в правку целого кадра")
+            LOGGER.warning("Mask is empty; region mode falls back to editing the whole image")
             return _replace(request, mask=refined, mask_mode=MASK_MASK), None
 
         prepared = _replace(

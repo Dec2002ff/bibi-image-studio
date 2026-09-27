@@ -91,10 +91,10 @@ def parse(text: str) -> Pose:
         data = data[0]
     people = data.get("people") or []
     if not people:
-        raise ValueError("в позе нет ни одного человека")
+        raise ValueError("pose contains no person")
     flat = people[0]["pose_keypoints_2d"]
     if len(flat) < POINTS * 3:
-        raise ValueError(f"в позе {len(flat) // 3} точек вместо {POINTS}")
+        raise ValueError(f"pose has {len(flat) // 3} points instead of {POINTS}")
     points = tuple(
         (float(flat[3 * i]), float(flat[3 * i + 1]), float(flat[3 * i + 2])) for i in range(POINTS)
     )

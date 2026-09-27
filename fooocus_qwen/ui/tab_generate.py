@@ -445,7 +445,7 @@ def build(studio, localizer: Localizer, language=None) -> dict:
             # для README). ``selected_index=0`` открывает первую картинку в просмотре.
             return gr.Gallery(value=paths, selected_index=0), sentences(message, report_line)
         except Exception as error:  # noqa: BLE001
-            LOGGER.exception("Обработчик генерации не выполнен")
+            LOGGER.exception("Generate handler failed")
             return [], describe_failure(error, lang)
 
     def stop(lang):
@@ -488,7 +488,7 @@ def build(studio, localizer: Localizer, language=None) -> dict:
         try:
             payload = library.load_prompt(name, config.PROMPT_DIR)
         except (FileNotFoundError, ValueError, OSError) as error:
-            LOGGER.warning("Пресет «%s» не загружен: %s", name, error)
+            LOGGER.warning("Preset '%s' not loaded: %s", name, error)
             return (gr.update(),) * 7 + (say("preset_load_failed", lang, name=name, error=error),)
         return (
             payload.get("prompt", ""),
@@ -507,7 +507,7 @@ def build(studio, localizer: Localizer, language=None) -> dict:
         except OSError as error:
             # Файл может быть открыт другой программой или лежать на томе,
             # доступном только на чтение: сказать об этом строкой состояния.
-            LOGGER.warning("Пресет «%s» не удалён: %s", name, error)
+            LOGGER.warning("Preset '%s' not deleted: %s", name, error)
             return gr.update(), say("preset_delete_failed", lang, name=name, error=error)
         message = (
             say("preset_deleted", lang, name=name) if removed else say("preset_missing", lang)

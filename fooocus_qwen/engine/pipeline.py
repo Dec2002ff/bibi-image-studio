@@ -32,10 +32,10 @@ def assert_contract() -> None:
     actual = list(inspect.signature(QwenImage21Pipeline._get_qwen_prompt_embeds).parameters)
     if actual != _EXPECTED_PARAMETERS:
         raise RuntimeError(
-            "Изменилась сигнатура QwenImage21Pipeline._get_qwen_prompt_embeds: "
-            f"ожидалось {_EXPECTED_PARAMETERS}, получено {actual}. "
-            "Кэш эмбеддингов встроен в этот метод — обновите fooocus_qwen/engine/pipeline.py "
-            "или зафиксируйте прежний коммит diffusers в requirements.txt."
+            "QwenImage21Pipeline._get_qwen_prompt_embeds signature has changed: "
+            f"expected {_EXPECTED_PARAMETERS}, got {actual}. "
+            "The embeddings cache hooks into this method; update fooocus_qwen/engine/pipeline.py "
+            "or pin the previous diffusers commit in requirements.txt."
         )
 
 
@@ -70,7 +70,7 @@ class QwenImage21StudioPipeline(QwenImage21Pipeline):
         key = cache.key(prompt, image)
         cached = cache.get(key)
         if cached is not None:
-            LOGGER.debug("Эмбеддинги промта взяты из кэша, энкодер не поднимался")
+            LOGGER.debug("Prompt embeddings taken from cache; text encoder not loaded")
             return tuple(tensor.to(target) for tensor in cached)
 
         with residency.text_encoder_resident():

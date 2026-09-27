@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from fooocus_qwen.logging_setup import use_utf8_console
 
-use_utf8_console()  # эти скрипты печатают по-русски; cp1252 их бы уронил
+use_utf8_console()  # пути и имена бывают не в латинице; cp1252 уронил бы печать
 
 BASE = "https://raw.githubusercontent.com/lllyasviel/Fooocus/main/sdxl_styles"
 FILES = (
@@ -42,7 +42,7 @@ def main() -> int:
         (TARGET / name).write_text(raw, encoding="utf-8")
         total += len(entries)
         print(f"{name}: {len(entries)}")
-    print(f"всего стилей: {total}")
+    print(f"total styles: {total}")
     return 0
 
 

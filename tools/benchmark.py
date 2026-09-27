@@ -65,7 +65,7 @@ def measure(engine: Generator, request: GenerationRequest, repeats: int) -> dict
         produced = engine.generate(request)
         elapsed = time.perf_counter() - started
         if not produced:
-            return {"error": "генерация не вернула изображений"}
+            return {"error": "generation returned no images"}
         if attempt > 0:
             durations.append(elapsed)
 
@@ -137,12 +137,12 @@ def render(report: dict, card: str) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Бенчмарк пресетов и числа референсов")
-    parser.add_argument("--repeats", type=int, default=3, help="замеров после прогревочного")
+    parser = argparse.ArgumentParser(description="Benchmark of quality presets and reference counts")
+    parser.add_argument("--repeats", type=int, default=3, help="measured runs after the warm-up one")
     parser.add_argument("--references", type=int, nargs="*", default=[0, 1, 5, 10])
-    parser.add_argument("--skip-presets", action="store_true", help="не перемерять пресеты")
+    parser.add_argument("--skip-presets", action="store_true", help="do not re-measure the presets")
     parser.add_argument("--carry", type=str, default=None,
-                        help="json с уже измеренными пресетами, чтобы дописать к ним референсы")
+                        help="json with already measured presets, to append reference results to")
     args = parser.parse_args()
 
     logging_setup.setup_logging(False)
@@ -181,7 +181,7 @@ def main() -> int:
         try:
             result = measure(engine, request, args.repeats)
         except torch.cuda.OutOfMemoryError:
-            result = {"error": "нехватка видеопамяти"}
+            result = {"error": "out of video memory"}
             torch.cuda.empty_cache()
         report["presets"][name] = result
         print(f"{name}: {result}", flush=True)
@@ -196,10 +196,10 @@ def main() -> int:
         try:
             result = measure(engine, request, 1)
         except torch.cuda.OutOfMemoryError:
-            result = {"error": "нехватка видеопамяти"}
+            result = {"error": "out of video memory"}
             torch.cuda.empty_cache()
         report["references"][str(count)] = result
-        print(f"референсов {count}: {result}", flush=True)
+        print(f"references {count}: {result}", flush=True)
         flush()
 
     report["cache"] = {"hits": cache.hits, "misses": cache.misses}
@@ -210,7 +210,7 @@ def main() -> int:
     (config.LOG_DIR / "benchmark.json").write_text(
         json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    print(f"\nОтчёт: {destination}")
+    print(f"\nReport: {destination}")
     return 0
 
 

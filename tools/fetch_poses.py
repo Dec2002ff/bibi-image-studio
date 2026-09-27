@@ -22,19 +22,19 @@ from fooocus_qwen import config
 from fooocus_qwen.logging_setup import use_utf8_console
 from fooocus_qwen.poses import library
 
-use_utf8_console()  # скрипт печатает по-русски; cp1252 его бы уронил
+use_utf8_console()  # пути и имена бывают не в латинице; cp1252 уронил бы печать
 
 
 def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--archive", type=Path, default=None, help="уже скачанный poses.zip")
+    parser = argparse.ArgumentParser(description="Build the openposes.com pose catalog into resources/poses/catalog.")
+    parser.add_argument("--archive", type=Path, default=None, help="an already downloaded poses.zip")
     args = parser.parse_args(argv)
 
     def report(done: int, total: int) -> None:
-        print(f"\rплитки: {done}/{total}", end="", flush=True)
+        print(f"\rtiles: {done}/{total}", end="", flush=True)
 
     count = library.fetch_catalog(config.POSE_LIBRARY_DIR, archive=args.archive, progress=report)
-    print(f"\nкаталог: {count} поз в {config.POSE_LIBRARY_DIR}")
+    print(f"\ncatalog: {count} poses in {config.POSE_LIBRARY_DIR}")
     return 0
 
 

@@ -48,10 +48,10 @@ def load(path: Path | None = None) -> Settings:
     except FileNotFoundError:
         return Settings()
     except (OSError, ValueError) as error:
-        LOGGER.warning("Файл настроек %s не читается (%s), беру значения по умолчанию", path, error)
+        LOGGER.warning("Settings file %s is unreadable (%s), using defaults", path, error)
         return Settings()
     if not isinstance(raw, dict):
-        LOGGER.warning("Файл настроек %s — не объект, беру значения по умолчанию", path)
+        LOGGER.warning("Settings file %s is not an object, using defaults", path)
         return Settings()
 
     settings = Settings()
@@ -59,7 +59,7 @@ def load(path: Path | None = None) -> Settings:
     if precision in PRECISIONS:
         settings = replace(settings, precision=precision)
     else:
-        LOGGER.warning("Неизвестная точность %r в %s, беру %s", precision, path, settings.precision)
+        LOGGER.warning("Unknown precision %r in %s, using %s", precision, path, settings.precision)
     sage = raw.get("sage_attention", settings.sage_attention)
     if isinstance(sage, bool):
         settings = replace(settings, sage_attention=sage)
@@ -73,7 +73,7 @@ def save(settings: Settings, path: Path | None = None) -> None:
     полуфайл, и следующий запуск молча вернулся бы к значениям по умолчанию.
     """
     if settings.precision not in PRECISIONS:
-        raise ValueError(f"неизвестная точность: {settings.precision!r}")
+        raise ValueError(f"unknown precision: {settings.precision!r}")
     path = path or config.SETTINGS_FILE
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".tmp")

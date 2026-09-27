@@ -20,9 +20,9 @@ from .endpoint import LlmEndpoint, load_endpoint, parse_endpoint_file
 
 LOGGER = logging.getLogger(__name__)
 
-HEADER = """# Адрес внешней языковой модели для AI-буста промтов.
-# Формат свободный: имя бэкенда, адрес, токен. Порядок строк не важен.
-# Файл можно править руками или во вкладке «Настройки».
+HEADER = """# External language model address for AI prompt boost.
+# Free format: backend name, address, token. Line order does not matter.
+# Edit this file by hand or on the Settings tab.
 """
 
 
@@ -62,30 +62,30 @@ def configure(
     ask, ask_secret = _forgiving(ask), _forgiving(ask_secret)
     current = _describe_current(path)
     if current:
-        out(f"  сейчас настроено: {current}")
-        question = "  Новый адрес языковой модели (Enter — оставить как есть): "
+        out(f"  currently configured: {current}")
+        question = "  New language model address (Enter = keep current): "
     else:
-        out("  AI-буст промтов работает через внешний OpenAI-совместимый сервер")
-        out("  (llama.cpp, vLLM, LM Studio). Без него работает всё остальное.")
-        question = "  Адрес языковой модели, например 192.0.2.10:8000 (Enter — пропустить): "
+        out("  AI prompt boost uses an external OpenAI-compatible server")
+        out("  (llama.cpp, vLLM, LM Studio). Everything else works without it.")
+        question = "  Language model address, e.g. 192.0.2.10:8000 (Enter = skip): "
 
     host = ask(question).strip()
     if not host:
-        out("  Пропускаю: " + ("настройка осталась прежней" if current else "AI-буст будет отключён"))
+        out("  Skipped: " + ("settings unchanged" if current else "AI boost will be disabled"))
         return False
 
-    token = ask_secret("  Токен (Enter — без токена, ввод не отображается): ").strip()
+    token = ask_secret("  Token (Enter = no token, input is hidden): ").strip()
 
     text = render(host, token or None)
     try:
         endpoint = parse_endpoint_file(text)
     except ValueError as error:
-        out(f"  Не понял адрес «{host}»: {error}")
-        out("  Файл не тронут, адрес можно задать позже во вкладке «Настройки».")
+        out(f"  Could not parse address '{host}': {error}")
+        out("  File left untouched; the address can be set later on the Settings tab.")
         return False
 
     path.write_text(text, encoding="utf-8")
-    out(f"  Записано в {path.name}: {endpoint.base_url}" + (", токен задан" if token else ", без токена"))
+    out(f"  Saved to {path.name}: {endpoint.base_url}" + (", token set" if token else ", no token"))
 
     if probe is not None:
         _report_probe(endpoint, probe, out)
@@ -119,7 +119,7 @@ def _describe_current(path: Path) -> str:
         endpoint = load_endpoint(path)
     except (OSError, ValueError):
         return ""
-    return endpoint.base_url + (", токен задан" if endpoint.token else ", без токена")
+    return endpoint.base_url + (", token set" if endpoint.token else ", no token")
 
 
 def _report_probe(
@@ -131,10 +131,10 @@ def _report_probe(
     try:
         models = list(probe(endpoint))
     except Exception as error:  # noqa: BLE001 — причина важна человеку, а не типу
-        out(f"  Сервер {endpoint.base_url} не откликнулся ({error}).")
-        out("  Настройка сохранена — проверить связь можно позже во вкладке «Настройки».")
+        out(f"  Server {endpoint.base_url} did not respond ({error}).")
+        out("  Settings saved; the connection can be checked later on the Settings tab.")
         return
     if models:
-        out(f"  Сервер ответил, моделей доступно {len(models)}: {', '.join(models[:3])}")
+        out(f"  Server responded, {len(models)} models available: {', '.join(models[:3])}")
     else:
-        out("  Сервер ответил, но список моделей пуст — проверьте, что модель загружена.")
+        out("  Server responded, but the model list is empty: make sure a model is loaded.")

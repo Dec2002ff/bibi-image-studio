@@ -179,7 +179,8 @@ The installer:
    INT8 transformer (7.3 GB, `unsloth/Qwen-Image-2.1-FP8`) goes to
    `Qwen-Image-2.1-INT8/`, ~26 GB in total. It checks the files listed in the
    model's index, resumes an interrupted download and skips what is already
-   there;
+   there. The pose recognition weights (DWPose, 350 MB) go to `DWPose/` in the
+   same step;
 6. **asks for the language model address and token** for AI boost and tests
    the connection. Press Enter to skip: everything except AI boost and
    *Describe image* works without it;
@@ -205,13 +206,13 @@ type the first prompt (about 30 seconds).
 Arguments are passed through to the application:
 
 ```powershell
-.\run.ps1 --lang en --port 7870 --preset LowQuality
+.\run.ps1 --lang ru --port 7870 --preset LowQuality
 ```
 
 | Flag | Meaning |
 |---|---|
 | `--host`, `--port` | listen address (default `0.0.0.0:7865`) |
-| `--lang ru\|en` | interface language at start |
+| `--lang en\|ru` | interface language at start (default `en`; switch any time with the EN/RU button) |
 | `--preset LowQuality\|MiddleQuality\|MaxQuality` | default quality preset |
 | `--no-open-browser` | don't open the browser |
 | `--no-preload` | load the model on first use instead of at start |

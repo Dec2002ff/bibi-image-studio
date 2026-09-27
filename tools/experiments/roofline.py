@@ -76,7 +76,7 @@ def measure_attention_peak(seq: int, heads: int, dim: int, repeats: int = 20) ->
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Достигнутая доля пика карты")
+    parser = argparse.ArgumentParser(description="Achieved share of the GPU peak")
     parser.add_argument("--resolution", type=int, default=1536)
     parser.add_argument("--steps", type=int, default=6)
     args = parser.parse_args()
@@ -85,7 +85,7 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
 
     peak_gemm = measure_peak()
-    print(f"пик карты на bf16 GEMM: {peak_gemm:.1f} TFLOPS", flush=True)
+    print(f"GPU peak on bf16 GEMM: {peak_gemm:.1f} TFLOPS", flush=True)
 
     from fooocus_qwen.engine import loader
 
@@ -95,7 +95,7 @@ def main() -> int:
 
     parameters = sum(p.numel() for p in transformer.parameters())
     layers = len(transformer.transformer_blocks)
-    print(f"трансформер: {parameters / 1e9:.2f} млрд параметров, слоёв {layers}", flush=True)
+    print(f"transformer: {parameters / 1e9:.2f}B parameters, {layers} layers", flush=True)
 
     # Форма внимания снимается с настоящего прогона, а не предполагается.
     import diffusers.models.transformers.transformer_qwenimage21 as module
@@ -139,29 +139,29 @@ def main() -> int:
     peak_attention = measure_attention_peak(seq_q, heads, dim)
 
     report = {
-        "секунд_на_шаг": round(per_step, 3),
-        "токенов": tokens,
-        "форма_внимания": {"q": seq_q, "k": seq_k, "голов": heads, "размер_головы": dim},
-        "флопс_внимание_тфлоп": round(attention_flops / 1e12, 1),
-        "флопс_линейные_тфлоп": round(linear_flops / 1e12, 1),
-        "достигнуто_тфлопс": round(total_flops / per_step / 1e12, 1),
-        "пик_gemm_тфлопс": round(peak_gemm, 1),
-        "пик_внимания_тфлопс": round(peak_attention, 1),
+        "seconds_per_step": round(per_step, 3),
+        "tokens": tokens,
+        "attention_shape": {"q": seq_q, "k": seq_k, "heads": heads, "head_dim": dim},
+        "attention_tflop": round(attention_flops / 1e12, 1),
+        "linear_tflop": round(linear_flops / 1e12, 1),
+        "achieved_tflops": round(total_flops / per_step / 1e12, 1),
+        "peak_gemm_tflops": round(peak_gemm, 1),
+        "peak_attention_tflops": round(peak_attention, 1),
     }
-    report["доля_пика_%"] = round(100 * report["достигнуто_тфлопс"] / peak_gemm, 1)
+    report["peak_share_%"] = round(100 * report["achieved_tflops"] / peak_gemm, 1)
     (OUT / f"{args.resolution}.json").write_text(
         json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print(f"\n=== кадр {args.resolution}x{args.resolution} ===")
+    print(f"\n=== frame {args.resolution}x{args.resolution} ===")
     for key, value in report.items():
         print(f"{key:>26}: {value}")
     print()
-    if report["доля_пика_%"] > 70:
-        print("Шаг упирается в вычисления и идёт близко к пику карты: ускорять")
-        print("перестановкой вызовов нечего. Остаются меньше токенов, меньше")
-        print("шагов или другая точность.")
+    if report["peak_share_%"] > 70:
+        print("The step is compute-bound and runs close to the GPU peak: reordering")
+        print("calls has nothing left to speed up. What remains is fewer tokens,")
+        print("fewer steps or a different precision.")
     else:
-        print("До пика далеко — есть смысл искать накладные расходы.")
+        print("Far from the peak; it is worth looking for overheads.")
     return 0
 
 

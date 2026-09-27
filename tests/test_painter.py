@@ -137,7 +137,7 @@ def test_exif_rotation_is_applied_like_the_browser_does(uploads):
 def test_a_path_outside_the_upload_folder_is_refused(uploads, tmp_path):
     outside = tmp_path / "secret.png"
     Image.new("RGB", (4, 4)).save(outside)
-    with pytest.raises(payload.PayloadError, match="вне каталога загрузок"):
+    with pytest.raises(payload.PayloadError, match="outside the uploads directory"):
         payload.decode(_client_value(outside))
 
 
@@ -154,19 +154,19 @@ def test_a_layer_path_outside_the_upload_folder_is_refused(uploads, tmp_path):
     Image.new("RGB", (4, 4)).save(source)
     outside = tmp_path / "layer.png"
     Image.new("RGBA", (4, 4)).save(outside)
-    with pytest.raises(payload.PayloadError, match="вне каталога загрузок"):
+    with pytest.raises(payload.PayloadError, match="outside the uploads directory"):
         payload.decode(_client_value(source, str(outside)))
 
 
 def test_a_missing_file_is_a_readable_error(uploads):
-    with pytest.raises(payload.PayloadError, match="не найден"):
+    with pytest.raises(payload.PayloadError, match="not found"):
         payload.decode(_client_value(uploads / "нет.png"))
 
 
 @pytest.mark.parametrize("raw, fragment", [
-    ("не json", "не JSON"),
-    ("[1, 2]", "объектом"),
-    ('{"v": 99, "source": "x"}', "версия"),
+    ("не json", "not JSON"),
+    ("[1, 2]", "JSON object"),
+    ('{"v": 99, "source": "x"}', "version"),
 ])
 def test_a_malformed_value_is_a_readable_error(uploads, raw, fragment):
     with pytest.raises(payload.PayloadError, match=fragment):
@@ -174,10 +174,10 @@ def test_a_malformed_value_is_a_readable_error(uploads, raw, fragment):
 
 
 @pytest.mark.parametrize("layer, fragment", [
-    ("data:image/jpeg;base64,AAAA", "только в PNG"),
+    ("data:image/jpeg;base64,AAAA", "only as PNG"),
     ("data:image/png;base64,@@@@", "base64"),
-    ("data:image/png;base64," + base64.b64encode(b"not a png").decode(), "не читается"),
-    (12345, "строкой"),
+    ("data:image/png;base64," + base64.b64encode(b"not a png").decode(), "not a readable PNG"),
+    (12345, "must be a string"),
 ])
 def test_a_broken_layer_is_a_readable_error(uploads, layer, fragment):
     source = uploads / "photo.png"
@@ -190,7 +190,7 @@ def test_an_oversized_layer_is_refused_before_decoding(uploads, monkeypatch):
     source = uploads / "photo.png"
     Image.new("RGB", (4, 4)).save(source)
     monkeypatch.setattr(payload, "MAX_LAYER_CHARS", 64)
-    with pytest.raises(payload.PayloadError, match="слишком велик"):
+    with pytest.raises(payload.PayloadError, match="too large"):
         payload.decode(_client_value(source, _png_data_url(Image.new("RGBA", (64, 64)))))
 
 
@@ -236,7 +236,7 @@ def test_the_region_mode_reaches_the_painter():
 def test_the_painter_starts_in_the_language_and_mode_of_the_tab():
     demo = _edit_blocks()
     painter = next(block for block in demo.blocks.values() if isinstance(block, component.MaskPainter))
-    assert painter.props["lang"] == "ru"
+    assert painter.props["lang"] == config.AppConfig().lang, "язык кисти — язык запуска"
     assert painter.props["region"] == tab_edit.MASK_MASK
     assert painter.props["palette"] == list(tab_edit.ANNOTATION_COLOURS)
 
@@ -253,7 +253,7 @@ def test_a_bad_value_from_the_browser_becomes_a_status_line_not_a_crash(uploads,
     describe = _event(demo, "describe").fn
 
     update, message = describe(_client_value(outside), "ru")
-    assert "вне каталога загрузок" in message
+    assert "outside the uploads directory" in message
 
 
 # --- клиентская часть ----------------------------------------------------------

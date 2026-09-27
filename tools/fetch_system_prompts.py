@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from fooocus_qwen.logging_setup import use_utf8_console
 
-use_utf8_console()  # эти скрипты печатают по-русски; cp1252 их бы уронил
+use_utf8_console()  # пути и имена бывают не в латинице; cp1252 уронил бы печать
 
 BASE = "https://raw.githubusercontent.com/QwenLM/Qwen-Image-2.1/main/prompt_rewrite/prompts"
 FILES = ("system_prompt_t2i.txt", "system_prompt_edit.txt")
@@ -29,12 +29,12 @@ def main(argv: list[str]) -> int:
     for name in FILES:
         destination = TARGET / name
         if destination.exists() and not force:
-            print(f"{name}: уже есть, пропускаю (--force чтобы перезаписать)")
+            print(f"{name}: already present, skipping (--force to overwrite)")
             continue
         with urllib.request.urlopen(f"{BASE}/{name}", timeout=60) as response:
             text = response.read().decode("utf-8")
         destination.write_text(text, encoding="utf-8")
-        print(f"{name}: {len(text)} символов")
+        print(f"{name}: {len(text)} characters")
     return 0
 
 

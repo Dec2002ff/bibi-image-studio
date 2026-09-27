@@ -72,7 +72,7 @@ NO_CUTOUT = "transparent background, cut-out, sticker, alpha channel, checkerboa
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Кодировка маски при дорисовке полей")
+    parser = argparse.ArgumentParser(description="Mask encoding for outpainting")
     parser.add_argument("--steps", type=int, default=16)
     parser.add_argument("--resolution", type=int, default=1024)
     parser.add_argument("--amount", type=float, default=0.35)
@@ -102,11 +102,11 @@ def main() -> int:
     # Каждый прогон — кодировка, промт и (не)отрицательный промт. Порядок
     # такой, чтобы дешёвые прогоны без true_cfg_scale шли первыми.
     trials = {
-        "sharp+сцена": (pair_sharp, SCENE, None),
-        "hole+сцена": ([holed], SCENE, None),
-        "soft+сцена": (pair_soft, SCENE, None),
-        "sharp+сцена+отрицание": (pair_sharp, SCENE, NO_CUTOUT),
-        "sharp+операция+отрицание": (pair_sharp, VAGUE, NO_CUTOUT),
+        "sharp+scene": (pair_sharp, SCENE, None),
+        "hole+scene": ([holed], SCENE, None),
+        "soft+scene": (pair_soft, SCENE, None),
+        "sharp+scene+negative": (pair_sharp, SCENE, NO_CUTOUT),
+        "sharp+operation+negative": (pair_sharp, VAGUE, NO_CUTOUT),
     }
 
     pipe, residency, _cache = loader.load(config.MODEL_DIR)
@@ -144,12 +144,12 @@ def main() -> int:
         (OUT / "scores.json").write_text(json.dumps(rows, ensure_ascii=False, indent=2),
                                          encoding="utf-8")
 
-    print("\n=== сводка (сто процентов и есть годный результат) ===")
+    print("\n=== summary (one hundred percent is a usable result) ===")
     for key, row in sorted(rows.items(), key=lambda item: -item[1]["opaque_in_new_area_pct"]):
-        print(f"{key:>6} | непрозрачно в новой площади {row['opaque_in_new_area_pct']:>6} % "
-              f"| кадр {row['frame']}")
-    print(f"\nперестановок энкодера: {int(residency.stats()['swaps'])}")
-    print(f"кадры: {OUT}")
+        print(f"{key:>6} | opaque in the new area {row['opaque_in_new_area_pct']:>6} % "
+              f"| frame {row['frame']}")
+    print(f"\nencoder swaps: {int(residency.stats()['swaps'])}")
+    print(f"frames: {OUT}")
     return 0
 
 

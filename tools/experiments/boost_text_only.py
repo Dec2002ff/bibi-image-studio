@@ -78,16 +78,16 @@ def invented(instruction: str, answer: str) -> list[str]:
 
 def main() -> int:
     use_utf8_console()
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--runs", type=int, default=4, help="повторов на инструкцию и вариант")
-    parser.add_argument("--instruction", default=None, help="только эта инструкция вместо набора")
+    parser = argparse.ArgumentParser(description="Experiment: edit AI boost with a language model without vision.")
+    parser.add_argument("--runs", type=int, default=4, help="repeats per instruction and variant")
+    parser.add_argument("--instruction", default=None, help="only this instruction instead of the set")
     args = parser.parse_args()
     instructions = [args.instruction] if args.instruction else INSTRUCTIONS
 
     studio = Studio(config.AppConfig())
     client = studio.llm_client()
     system = (config.SYSTEM_PROMPT_DIR / "system_prompt_edit.txt").read_text(encoding="utf-8")
-    print(f"модель: {client.model or '(без имени)'}\n")
+    print(f"model: {client.model or '(unnamed)'}\n")
 
     variants = {
         "plain": lambda text: boost.build_user_message(text, 1),
@@ -106,12 +106,12 @@ def main() -> int:
                 extra = invented(instruction, answer)
                 row["invented"] += bool(extra)
                 print(f"[{name}] {instruction!r}: {'CJK ' if CJK.search(answer) else ''}"
-                      f"{('выдумано: ' + ', '.join(extra)) if extra else ''}\n    {answer[:150]!r}")
+                      f"{('invented: ' + ', '.join(extra)) if extra else ''}\n    {answer[:150]!r}")
 
-    print("\nвариант | ответов | не на языке инструкции | выдуманное содержимое | среднее, с")
+    print("\nvariant | answers | not in instruction language | invented content | mean, s")
     for name, row in totals.items():
         n = row["n"]
-        print(f"{name:7} | {n:7} | {row['cjk'] / n:22.0%} | {row['invented'] / n:21.0%} | "
+        print(f"{name:7} | {n:7} | {row['cjk'] / n:27.0%} | {row['invented'] / n:16.0%} | "
               f"{row['seconds'] / n:.1f}")
     return 0
 

@@ -83,11 +83,11 @@ def decode(raw: str | None, roots: Iterable[Path] | None = None) -> Canvas:
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as error:
-        raise PayloadError(f"значение кисти не JSON: {error.msg}") from error
+        raise PayloadError(f"brush value is not JSON: {error.msg}") from error
     if not isinstance(data, dict):
-        raise PayloadError("значение кисти должно быть объектом JSON")
+        raise PayloadError("brush value must be a JSON object")
     if data.get("v") != PROTOCOL:
-        raise PayloadError(f"неизвестная версия значения кисти: {data.get('v')!r}")
+        raise PayloadError(f"unknown brush value version: {data.get('v')!r}")
 
     allowed = [Path(root).resolve() for root in (roots if roots is not None else [upload_root()])]
     source = data.get("source")
@@ -146,11 +146,11 @@ def _inside(path: str, roots: list[Path]) -> Path:
     try:
         resolved = Path(path).resolve(strict=True)
     except (OSError, RuntimeError) as error:
-        raise PayloadError(f"файл кисти не найден: {Path(path).name}") from error
+        raise PayloadError(f"brush file not found: {Path(path).name}") from error
     for root in roots:
         if resolved == root or root in resolved.parents:
             return resolved
-    raise PayloadError("путь вне каталога загрузок отклонён")
+    raise PayloadError("path outside the uploads directory rejected")
 
 
 def _open(path: Path) -> Image.Image:
@@ -159,7 +159,7 @@ def _open(path: Path) -> Image.Image:
             image.load()
             return image.copy()
     except (UnidentifiedImageError, OSError) as error:
-        raise PayloadError(f"не удалось прочитать изображение {path.name}: {error}") from error
+        raise PayloadError(f"failed to read image {path.name}: {error}") from error
 
 
 def _read_layer(value: Any, roots: list[Path], size: tuple[int, int]) -> Image.Image | None:
@@ -174,23 +174,23 @@ def _read_layer(value: Any, roots: list[Path], size: tuple[int, int]) -> Image.I
     if not value:
         return None
     if not isinstance(value, str):
-        raise PayloadError("слой кисти должен быть строкой")
+        raise PayloadError("brush layer must be a string")
 
     if value.startswith("data:"):
         if not value.startswith(_DATA_URL_PREFIX):
-            raise PayloadError("слой кисти принимается только в PNG")
+            raise PayloadError("brush layer is accepted only as PNG")
         if len(value) > MAX_LAYER_CHARS:
-            raise PayloadError("слой кисти слишком велик")
+            raise PayloadError("brush layer is too large")
         try:
             raw = base64.b64decode(value[len(_DATA_URL_PREFIX):], validate=True)
         except (binascii.Error, ValueError) as error:
-            raise PayloadError("слой кисти повреждён: base64 не читается") from error
+            raise PayloadError("brush layer is corrupted: base64 is unreadable") from error
         try:
             with Image.open(io.BytesIO(raw)) as image:
                 image.load()
                 layer = image.convert("RGBA")
         except (UnidentifiedImageError, OSError) as error:
-            raise PayloadError(f"слой кисти не читается как PNG: {error}") from error
+            raise PayloadError(f"brush layer is not a readable PNG: {error}") from error
     else:
         layer = _open(_inside(value, roots)).convert("RGBA")
 

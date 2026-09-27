@@ -58,8 +58,8 @@ def decode_tiled(
     overlap = (tile_latent - stride_latent) * ratio
     if trim > overlap:
         raise ValueError(
-            f"обрезка {trim} шире перекрытия плиток {overlap}: между плитками остались бы "
-            "незакрытые полосы. Уменьшите обрезку или шаг плитки."
+            f"trim {trim} exceeds tile overlap {overlap}: uncovered strips would remain between tiles. "
+            "Reduce the trim or the tile stride."
         )
 
     # Кадр мельче плитки режут только чтобы испортить: одна плитка — это и
@@ -108,11 +108,11 @@ def decode_tiled(
             weights[..., y0:y1, x0:x1] += window
 
     if accumulator is None or weights is None:  # pragma: no cover — цикл всегда даёт хоть плитку
-        raise RuntimeError("латент не дал ни одной плитки")
+        raise RuntimeError("latent produced no tiles")
 
     uncovered = int((weights <= 0).sum())
     if uncovered:  # pragma: no cover — геометрия проверена тестами на всех размерах
-        raise RuntimeError(f"плитки не закрыли {uncovered} пикселей кадра")
+        raise RuntimeError(f"tiles left {uncovered} image pixels uncovered")
     return (accumulator / weights).to(latent.dtype)
 
 
@@ -191,9 +191,9 @@ class SeamlessTiledVae:
 
         ratio = self.spatial_compression_ratio
         if self.tile_sample_min_height != self.tile_sample_min_width:
-            raise ValueError("здешний декодер рассчитан на квадратную плитку")
+            raise ValueError("this decoder expects a square tile")
         if self.tile_sample_stride_height != self.tile_sample_stride_width:
-            raise ValueError("здешний декодер рассчитан на одинаковый шаг по осям")
+            raise ValueError("this decoder expects the same stride on both axes")
 
         def decode_piece(piece: torch.Tensor) -> torch.Tensor:
             """Повторяет нетайловый путь ``_decode`` для одного куска латента."""
@@ -255,4 +255,4 @@ def install(vae) -> None:
     if isinstance(vae, SeamlessTiledVae):
         return
     vae.__class__ = type(f"Seamless{type(vae).__name__}", (SeamlessTiledVae, type(vae)), {})
-    LOGGER.debug("Тайловый декодер VAE заменён на бесшовный")
+    LOGGER.debug("VAE tiled decoder replaced with the seamless one")

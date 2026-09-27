@@ -68,9 +68,9 @@ def apply(transformer, use_sage: bool) -> bool:
     """
     enabled = use_sage and sage_available()
     if use_sage and not enabled:
-        LOGGER.warning("SageAttention выбран, но не установлен — внимание остаётся штатным")
+        LOGGER.warning("SageAttention is selected but not installed; using the default attention")
     if enabled:
         _install_mask_guard()
     transformer.set_attention_backend(SAGE if enabled else NATIVE)
-    LOGGER.info("Внимание: %s", "SageAttention" if enabled else "штатное")
+    LOGGER.info("Attention: %s", "SageAttention" if enabled else "default")
     return enabled

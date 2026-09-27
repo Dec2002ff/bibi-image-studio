@@ -51,18 +51,18 @@ def configure(
     sage_available = sage_available or _sage_importable
     current = settings_module.load(path)
 
-    out("  Точность весов трансформера:")
-    out("    1 — bf16: исходная точность, 13.3 ГиБ видеопамяти, веса ~33 ГБ")
-    out("    2 — INT8: 6.8 ГиБ видеопамяти, скорость почти та же, веса ~26 ГБ")
+    out("  Transformer weight precision:")
+    out("    1 - bf16: original precision, 13.3 GiB VRAM, ~33 GB of weights")
+    out("    2 - INT8: 6.8 GiB VRAM, nearly the same speed, ~26 GB of weights")
     default = "2" if current.precision == settings_module.PRECISION_INT8 else "1"
-    answer = ask(f"  Выбор (Enter — {default}): ").strip() or default
+    answer = ask(f"  Choice (Enter = {default}): ").strip() or default
     precision = settings_module.PRECISION_INT8 if answer == "2" else settings_module.PRECISION_BF16
     if answer not in ("1", "2"):
-        out(f"  Не понял «{answer}», оставляю {precision}")
+        out(f"  Did not understand '{answer}', keeping {precision}")
 
-    out("  SageAttention ускоряет генерацию на 15–25 %, пакет ставится отдельно.")
-    default_sage = "да" if current.sage_attention else "нет"
-    reply = ask(f"  Установить и включить SageAttention? [да/нет] (Enter — {default_sage}): ").strip().lower()
+    out("  SageAttention speeds up generation by 15-25%; the package is installed separately.")
+    default_sage = "yes" if current.sage_attention else "no"
+    reply = ask(f"  Install and enable SageAttention? [yes/no] (Enter = {default_sage}): ").strip().lower()
     wants_sage = current.sage_attention if not reply else reply in ("да", "д", "yes", "y")
 
     if wants_sage and not sage_available():
@@ -70,7 +70,7 @@ def configure(
 
     chosen = settings_module.Settings(precision=precision, sage_attention=wants_sage)
     settings_module.save(chosen, path)
-    out(f"  Записано: точность {precision}, SageAttention {'включён' if wants_sage else 'выключен'}")
+    out(f"  Saved: precision {precision}, SageAttention {'enabled' if wants_sage else 'disabled'}")
     return chosen
 
 
@@ -91,13 +91,13 @@ def install_sage_attention(out: Callable[..., None] = print, python: str | None 
         out(f"  pip install {' '.join(step)}")
         result = subprocess.run([python, "-m", "pip", "install", *step], check=False)
         if result.returncode != 0:
-            out("  SageAttention не установился; работаю штатным вниманием, это не мешает остальному.")
+            out("  SageAttention failed to install; using default attention, everything else works.")
             return False
     ok = subprocess.run(
         [python, "-c", "from diffusers.models import attention_dispatch as d; raise SystemExit(0 if d._CAN_USE_SAGE_ATTN else 1)"],
         check=False,
     ).returncode == 0
-    out("  SageAttention установлен" if ok else "  SageAttention установлен, но diffusers его не видит — остаюсь на штатном")
+    out("  SageAttention installed" if ok else "  SageAttention installed, but diffusers does not see it: keeping default attention")
     return ok
 
 
@@ -111,22 +111,22 @@ def sage_install_plan(torch_version: str | None = None, cuda: str | None = None,
         try:
             import torch
         except ImportError:
-            return "torch не установлен — SageAttention ставить не к чему."
+            return "torch is not installed: nothing to install SageAttention for."
         torch_version = torch_version or torch.__version__
         cuda = cuda if cuda is not None else (torch.version.cuda or "")
 
     if not platform.startswith("win"):
         return (
-            "Готовых сборок SageAttention 2 под Linux нет; соберите из исходников: "
-            f"pip install {SAGE_SOURCE} (нужен CUDA Toolkit). Пока — штатное внимание."
+            "There are no prebuilt SageAttention 2 wheels for Linux; build from source: "
+            f"pip install {SAGE_SOURCE} (requires the CUDA Toolkit). Using default attention for now."
         )
     major_minor = _major_minor(torch_version)
     if major_minor is None or major_minor < (2, 10):
-        return f"Сборки SageAttention под torch {torch_version} нет (нужен 2.10 и новее)."
+        return f"No SageAttention wheel for torch {torch_version} (2.10 or newer is required)."
     cuda_tag = "cu" + cuda.replace(".", "")
     wheel = SAGE_WHEELS.get(cuda_tag)
     if wheel is None:
-        return f"Сборки SageAttention под CUDA {cuda} нет (есть под 12.8 и 13.0)."
+        return f"No SageAttention wheel for CUDA {cuda} (available for 12.8 and 13.0)."
     # triton-windows 3.N работает с torch 2.(N+4): 3.6 — 2.10, 3.7 — 2.11.
     triton_minor = major_minor[1] - 4
     triton = f"triton-windows>=3.{triton_minor},<3.{triton_minor + 1}"

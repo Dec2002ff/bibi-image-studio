@@ -102,7 +102,7 @@ class EmbedsCache:
         self._entries.move_to_end(key)
         while len(self._entries) > self._capacity:
             evicted, _ = self._entries.popitem(last=False)
-            LOGGER.debug("Из кэша эмбеддингов вытеснена запись %s", evicted.prompts[:1])
+            LOGGER.debug("Evicted embeddings cache entry %s", evicted.prompts[:1])
 
     def clear(self) -> None:
         self._entries.clear()

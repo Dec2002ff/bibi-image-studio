@@ -103,7 +103,7 @@ def test_load_prompt_corrupted_json_raises_damaged_not_notfound(tmp_path):
     with pytest.raises(ValueError) as exc_info:
         library.load_prompt("test", tmp_path)
     error_msg = str(exc_info.value).lower()
-    assert "повреждён" in error_msg or "повреж" in error_msg
+    assert "corrupted" in error_msg
 
 
 def test_load_prompt_non_dict_json_raises_damaged_not_notfound(tmp_path):
@@ -112,14 +112,14 @@ def test_load_prompt_non_dict_json_raises_damaged_not_notfound(tmp_path):
     with pytest.raises(ValueError) as exc_info:
         library.load_prompt("test", tmp_path)
     error_msg = str(exc_info.value).lower()
-    assert "повреждён" in error_msg or "повреж" in error_msg
+    assert "corrupted" in error_msg
 
 
 def test_load_prompt_genuinely_missing_raises_notfound(tmp_path):
     """load_prompt должна сообщить 'не найден' для полностью отсутствующего пресета."""
     with pytest.raises(FileNotFoundError) as exc_info:
         library.load_prompt("совсем_нет", tmp_path)
-    assert "не найден" in str(exc_info.value).lower()
+    assert "not found" in str(exc_info.value).lower()
 
 
 def test_save_prompt_does_not_duplicate_when_corrupted_file_exists(tmp_path):

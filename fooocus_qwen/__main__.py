@@ -17,34 +17,34 @@ def selftest() -> int:
     try:
         import torch
     except ImportError as error:
-        print(f"[нет] torch не импортируется: {error}")
+        print(f"[no ] torch cannot be imported: {error}")
         return 1
 
-    print(f"[ок ] torch {torch.__version__}")
+    print(f"[ok ] torch {torch.__version__}")
     if not torch.cuda.is_available():
-        problems.append("CUDA недоступна — модель пойдёт на процессоре, это неприемлемо медленно")
-        print("[нет] CUDA недоступна")
+        problems.append("CUDA is not available: the model would run on CPU, which is unacceptably slow")
+        print("[no ] CUDA is not available")
     else:
         name = torch.cuda.get_device_name(0)
         total = torch.cuda.get_device_properties(0).total_memory / 2**30
-        print(f"[ок ] CUDA: {name}, {total:.1f} ГБ")
+        print(f"[ok ] CUDA: {name}, {total:.1f} GiB")
 
     try:
         from diffusers import QwenImage21Pipeline  # noqa: F401
     except ImportError as error:
-        problems.append("QwenImage21Pipeline недоступен — нужен diffusers из git")
-        print(f"[нет] QwenImage21Pipeline не импортируется: {error}")
+        problems.append("QwenImage21Pipeline is not available: diffusers from git is required")
+        print(f"[no ] QwenImage21Pipeline cannot be imported: {error}")
     else:
         import diffusers
 
-        print(f"[ок ] diffusers {diffusers.__version__}, QwenImage21Pipeline на месте")
+        print(f"[ok ] diffusers {diffusers.__version__}, QwenImage21Pipeline found")
 
     index = config.MODEL_DIR / "model_index.json"
     if index.is_file():
-        print(f"[ок ] веса модели: {config.MODEL_DIR}")
+        print(f"[ok ] model weights: {config.MODEL_DIR}")
     else:
-        problems.append(f"не найден {index}")
-        print(f"[нет] веса модели не найдены: {index}")
+        problems.append(f"{index} not found")
+        print(f"[no ] model weights not found: {index}")
 
     # Производительность: выбор из user/settings.json и то, что ему нужно.
     from . import settings
@@ -53,68 +53,80 @@ def selftest() -> int:
     chosen = settings.load()
     if chosen.precision == settings.PRECISION_INT8:
         if fetch.missing_extra(config.INT8_DIR, (fetch.INT8_FILE,)):
-            problems.append("выбрана точность INT8, но нет её весов — запустите --fetch-model")
-            print(f"[нет] точность INT8: нет {config.INT8_DIR / fetch.INT8_FILE}")
+            problems.append("INT8 precision is selected but its weights are missing: run --fetch-model")
+            print(f"[no ] INT8 precision: missing {config.INT8_DIR / fetch.INT8_FILE}")
         else:
-            print("[ок ] точность INT8, веса на месте")
+            print("[ok ] INT8 precision, weights found")
     else:
-        print("[ок ] точность bf16")
+        print("[ok ] bf16 precision")
     if chosen.sage_attention:
         state = (
-            "[ок ] SageAttention включён" if attention.sage_available()
-            else "[--] SageAttention выбран, но не установлен — работаю штатным вниманием"
+            "[ok ] SageAttention enabled" if attention.sage_available()
+            else "[--] SageAttention selected but not installed: using default attention"
         )
         print(state)
     from .poses import detect
 
     if fetch.missing_extra(config.DWPOSE_DIR, detect.FILES):
-        problems.append("нет весов распознавания позы (DWPose) — запустите --fetch-model")
-        print(f"[нет] распознавание позы: нет весов DWPose в {config.DWPOSE_DIR}")
+        problems.append("pose detection weights (DWPose) are missing: run --fetch-model")
+        print(f"[no ] pose detection: DWPose weights missing in {config.DWPOSE_DIR}")
     else:
-        print("[ок ] распознавание позы: веса DWPose на месте")
+        print("[ok ] pose detection: DWPose weights found")
     turbo_ready = not fetch.missing_extra(config.TURBO_DIR, fetch.TURBO_FILES)
-    print("[ок ] Turbo: веса на месте" if turbo_ready else "[--] Turbo: веса скачаются при первом выборе пресета")
+    print("[ok ] Turbo: weights found" if turbo_ready else "[--] Turbo: weights will be downloaded when the preset is first selected")
 
     if problems:
-        print("\nНе готово к работе:")
+        print("\nNot ready:")
         for item in problems:
             print(f"  - {item}")
         return 1
 
-    print("\nОкружение готово.")
+    print("\nEnvironment is ready.")
     return 0
 
 
 def generate_once(args) -> int:
-    """Одна генерация без интерфейса: для проверки и для скриптов."""
+    """Одна генерация без интерфейса: для проверки и для скриптов.
+
+    Через ``Studio`` — ту же дорогу, что у интерфейса: точность весов и
+    SageAttention из настроек, адаптер Turbo (докачивается при первом
+    выборе). Прежде модель грузилась здесь напрямую, и ``--preset Turbo``
+    падал трассировкой: адаптер к такому генератору не подключался.
+    """
     from pathlib import Path
 
-    from .engine import loader, presets
-    from .engine.generator import GenerationRequest, Generator
+    from .engine import presets
+    from .engine.generator import GenerationRequest
     from .imaging import metadata
-    from .prompting.styles import load_styles
     from .storage import gallery
+    from .ui.state import Studio
 
-    pipe, residency, cache = loader.load(config.MODEL_DIR, pin_memory=args.pin_memory)
-    engine = Generator(pipe, residency, cache, load_styles(config.STYLES_DIR))
+    studio = Studio(config.AppConfig(pin_memory=args.pin_memory, preset=args.preset, lang="en"))
+    preset = presets.get(args.preset)
+    failure = studio.weights_for(preset, "en")
+    if failure:
+        print(failure)
+        return 1
 
     def show(index: int, step: int, total: int) -> None:
-        print(f"\rкартинка {index + 1}: шаг {step}/{total}", end="", flush=True)
+        print(f"\rimage {index + 1}: step {step}/{total}", end="", flush=True)
 
-    results = engine.generate(
-        GenerationRequest(prompt=args.prompt, preset=presets.get(args.preset)), progress=show
+    results, failure = studio.run_generation(
+        GenerationRequest(prompt=args.prompt, prompt_original=args.prompt, preset=preset), "en", progress=show
     )
     print()
-
+    if failure:
+        print(failure)
+        return 1
     if not results:
-        print("Ничего не сгенерировано")
+        print("Nothing was generated")
         return 1
 
     destination = Path(args.out) if args.out else gallery.next_path(config.OUTPUT_DIR)
     metadata.save_png(results[0].image, destination, results[0].parameters)
-    print(f"Сохранено: {destination}")
-    print(f"Сид: {results[0].seed}, время: {results[0].parameters['seconds']} с")
-    print(f"Память: {residency.stats()}")
+    print(f"Saved: {destination}")
+    print(f"Seed: {results[0].seed}, time: {results[0].parameters['seconds']} s")
+    print(f"Memory: {studio.memory_report('en')}")
     return 0
 
 
@@ -137,18 +149,18 @@ def fetch_model() -> int:
             downloaded = fetch.ensure_int8(config.INT8_DIR) or downloaded
         poses = fetch.ensure_files(config.DWPOSE_DIR, detect.REPO, detect.FILES)
     except fetch.ModelDownloadError as error:
-        print(f"[нет] {error}")
+        print(f"[no ] {error}")
         return 1
     except OSError as error:
         # Сеть, диск, права: причина человеку важнее типа исключения.
-        print(f"[нет] не удалось скачать веса: {error}")
+        print(f"[no ] failed to download weights: {error}")
         return 1
 
     if downloaded:
-        print(f"[ок ] веса скачаны: {config.MODEL_DIR}")
+        print(f"[ok ] weights downloaded: {config.MODEL_DIR}")
     else:
-        print(f"[ок ] веса на месте: {config.MODEL_DIR}")
-    print(f"[ок ] веса распознавания позы {'скачаны' if poses else 'на месте'}: {config.DWPOSE_DIR}")
+        print(f"[ok ] weights found: {config.MODEL_DIR}")
+    print(f"[ok ] pose detection weights {'downloaded' if poses else 'found'}: {config.DWPOSE_DIR}")
     return 0
 
 
@@ -171,8 +183,8 @@ def setup_llm() -> int:
     from .llm import setup
 
     if not sys.stdin.isatty():
-        print("  Пропускаю настройку языковой модели: установка идёт без консоли.")
-        print(f"  Адрес можно задать позже в {config.ENDPOINT_FILE.name} или во вкладке «Настройки».")
+        print("  Skipping language model setup: no console attached.")
+        print(f"  The address can be set later in {config.ENDPOINT_FILE.name} or on the Settings tab.")
         return 0
 
     setup.configure(config.ENDPOINT_FILE)

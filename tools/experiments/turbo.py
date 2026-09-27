@@ -163,9 +163,9 @@ def main() -> int:
             spent = time.perf_counter() - started
             image.save(OUT / f"{case}-{variant}.png")
             images[variant] = image
-            row = {"секунд": round(spent, 2), "пик_гиб": round(torch.cuda.max_memory_allocated() / 2**30, 2)}
+            row = {"seconds": round(spent, 2), "peak_gib": round(torch.cuda.max_memory_allocated() / 2**30, 2)}
             if "mask" in kwargs:
-                row["вне_маски_изменено"] = outside_changed(mug, image, kwargs["mask"])
+                row["outside_mask_changed"] = outside_changed(mug, image, kwargs["mask"])
             rows[f"{case} / {variant}"] = row
             print(f"{case} / {variant}: {row}", flush=True)
             (OUT / "scores.json").write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -175,13 +175,13 @@ def main() -> int:
         canvas.paste(pair[1], (pair[0].width + 16, 0))
         canvas.save(OUT / f"{case}-pair.jpg", quality=90)
 
-    print("\n=== сводка ===")
+    print("\n=== summary ===")
     for case, _ in cases:
         base, fast = rows[f"{case} / base"], rows[f"{case} / turbo"]
-        print(f"{case:>11}: база {base['секунд']:>6} с → turbo {fast['секунд']:>6} с "
-              f"(x{base['секунд'] / fast['секунд']:.1f}); пик {base['пик_гиб']} → {fast['пик_гиб']} ГиБ"
-              + (f"; вне маски изменено: {fast.get('вне_маски_изменено')}" if "вне_маски_изменено" in fast else ""))
-    print(f"\nпары «база | turbo»: {OUT}")
+        print(f"{case:>11}: base {base['seconds']:>6} s → turbo {fast['seconds']:>6} s "
+              f"(x{base['seconds'] / fast['seconds']:.1f}); peak {base['peak_gib']} → {fast['peak_gib']} GiB"
+              + (f"; changed outside the mask: {fast.get('outside_mask_changed')}" if "outside_mask_changed" in fast else ""))
+    print(f"\npairs \"base | turbo\": {OUT}")
     return 0
 
 

@@ -43,14 +43,17 @@ import torch
 from fooocus_qwen import config, logging_setup
 
 OUT = config.LOG_DIR / "pinning"
+# Файл замеров с английскими ключами. Прежний scores.json (русские ключи)
+# не дочитывается: его строки уронили бы опыт на KeyError.
+SCORES = "scores.en.json"
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Цена и польза закрепления памяти")
+    parser = argparse.ArgumentParser(description="Cost and benefit of pinned memory")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--pin", dest="pin", action="store_true")
     group.add_argument("--no-pin", dest="pin", action="store_false")
-    parser.add_argument("--swaps", type=int, default=3, help="сколько перестановок померить")
+    parser.add_argument("--swaps", type=int, default=3, help="how many swaps to measure")
     args = parser.parse_args()
 
     logging_setup.setup_logging(False)
@@ -83,31 +86,31 @@ def main() -> int:
         swap_times.append(time.perf_counter() - started)
 
     row = {
-        "закрепление": args.pin,
-        "чтение_весов_с": round(read_seconds, 1),
-        "подготовка_копий_с": round(stage_seconds, 1),
-        "перестановка_с": round(min(swap_times), 2),
-        "перестановки": [round(t, 2) for t in swap_times],
+        "pinned": args.pin,
+        "weights_read_s": round(read_seconds, 1),
+        "copies_staging_s": round(stage_seconds, 1),
+        "swap_s": round(min(swap_times), 2),
+        "swaps": [round(t, 2) for t in swap_times],
     }
 
-    path = OUT / "scores.json"
+    path = OUT / SCORES
     rows = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-    rows["с закреплением" if args.pin else "без закрепления"] = row
+    rows["pinned" if args.pin else "unpinned"] = row
     path.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"\n{row}")
 
     if len(rows) == 2:
-        pinned, plain = rows["с закреплением"], rows["без закрепления"]
-        saved = plain["подготовка_копий_с"] - pinned["подготовка_копий_с"]  # < 0: закрепление дороже
-        gain = plain["перестановка_с"] - pinned["перестановка_с"]
-        print("\n=== сделка ===")
-        print(f"запуск: {pinned['подготовка_копий_с']} с с закреплением против "
-              f"{plain['подготовка_копий_с']} с без")
-        print(f"перестановка: {pinned['перестановка_с']} с против {plain['перестановка_с']} с")
+        pinned, plain = rows["pinned"], rows["unpinned"]
+        saved = plain["copies_staging_s"] - pinned["copies_staging_s"]  # < 0: закрепление дороже
+        gain = plain["swap_s"] - pinned["swap_s"]
+        print("\n=== trade-off ===")
+        print(f"startup: {pinned['copies_staging_s']} s pinned vs "
+              f"{plain['copies_staging_s']} s unpinned")
+        print(f"swap: {pinned['swap_s']} s vs {plain['swap_s']} s")
         if gain > 0:
-            print(f"окупается после {abs(saved) / gain:.0f} промахов кэша")
+            print(f"pays off after {abs(saved) / gain:.0f} cache misses")
         else:
-            print("закрепление не ускоряет перестановку — окупаться нечему")
+            print("pinning does not speed up the swap; nothing to pay off")
     return 0
 
 

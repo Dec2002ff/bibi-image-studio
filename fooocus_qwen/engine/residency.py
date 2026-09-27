@@ -110,7 +110,7 @@ class StagedModule:
                 except RuntimeError as error:
                     # Закрепить десятки гигабайт удаётся не всегда; работать без
                     # закрепления медленнее, но полностью корректно.
-                    LOGGER.warning("Не удалось закрепить память, продолжаю без неё: %s", error)
+                    LOGGER.warning("Failed to pin memory, continuing without it: %s", error)
                     pin_failed = True
             self._host[name] = host
             self._nbytes += _nbytes(host)
@@ -179,7 +179,7 @@ class StagedModule:
         try:
             self.to_host()
         except BaseException:
-            LOGGER.exception("Откат весов на хост не удался, модуль остался между устройствами")
+            LOGGER.exception("Failed to roll weights back to the host; the module is split across devices")
 
 
 class ResidencyManager:
@@ -195,7 +195,7 @@ class ResidencyManager:
 
     def start(self) -> None:
         """Раскладывает модели по местам. Вызывается один раз после загрузки."""
-        LOGGER.info("Готовлю копии весов на хосте (закрепление: %s)", "да" if self._pin_memory else "нет")
+        LOGGER.info("Preparing host copies of weights (pinned: %s)", "yes" if self._pin_memory else "no")
         self._transformer = StagedModule(self._pipe.transformer, self._device, self._pin_memory)
         self._text_encoder = StagedModule(self._pipe.text_encoder, self._device, self._pin_memory)
 
@@ -205,7 +205,7 @@ class ResidencyManager:
         self._transformer.to_device()
 
         LOGGER.info(
-            "Резидентно: трансформер %.1f ГБ, VAE на устройстве; на хосте: энкодер %.1f ГБ",
+            "Resident: transformer %.1f GiB, VAE on device; on host: text encoder %.1f GiB",
             self._transformer.nbytes / 2**30,
             self._text_encoder.nbytes / 2**30,
         )
@@ -217,7 +217,7 @@ class ResidencyManager:
         Вместе они не помещаются: 16.3 плюс 13.3 гигабайта против 24 доступных.
         """
         if self._text_encoder is None or self._transformer is None:
-            raise RuntimeError("ResidencyManager.start() не вызывался")
+            raise RuntimeError("ResidencyManager.start() was not called")
 
         self._swaps += 1
         # Обе перестановки — внутри try. Раньше они стояли до него, и сбой
@@ -245,7 +245,7 @@ class ResidencyManager:
         тензоры повторно не копируются (``pin_memory`` у них — тот же тензор).
         """
         if self._transformer is None:
-            raise RuntimeError("ResidencyManager.start() не вызывался")
+            raise RuntimeError("ResidencyManager.start() was not called")
         self._transformer.to_host()
         try:
             change(self._pipe.transformer)
@@ -273,7 +273,7 @@ class ResidencyManager:
         try:
             self._text_encoder.to_host()
         except BaseException:
-            LOGGER.exception("Не удалось снять текстовый энкодер с устройства")
+            LOGGER.exception("Failed to offload the text encoder from the device")
         self._transformer.to_device()
 
     def stats(self) -> dict[str, float]:

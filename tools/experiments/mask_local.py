@@ -94,7 +94,7 @@ def scores(source: Image.Image, produced: Image.Image, binary: np.ndarray) -> di
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Локальная правка: уважает ли модель маску")
+    parser = argparse.ArgumentParser(description="Local edit: does the model respect the mask")
     parser.add_argument("--steps", type=int, default=16)
     parser.add_argument("--resolution", type=int, default=1024)
     args = parser.parse_args()
@@ -150,13 +150,13 @@ def main() -> int:
                 json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8"
             )
 
-    print("\n=== сводка (чем меньше «снаружи», тем точнее модель попала в маску) ===")
-    print(f"{'вариант':>16} | {'внутри':>7} | {'снаружи':>8} | {'снаружи изм.':>13} | {'непрозр.':>9}")
+    print("\n=== summary (the lower \"outside\", the more precisely the model hit the mask) ===")
+    print(f"{'variant':>16} | {'inside':>7} | {'outside':>8} | {'outside chg.':>13} | {'opaque':>9}")
     for key, row in sorted(rows.items(), key=lambda item: item[1]["outside_mean"]):
         print(f"{key:>16} | {row['inside_mean']:>7} | {row['outside_mean']:>8} | "
               f"{row['outside_changed_pct']:>11} % | {row['opaque_pct']:>8} %")
-    print(f"\nперестановок энкодера: {int(residency.stats()['swaps'])}")
-    print(f"кадры: {OUT}")
+    print(f"\nencoder swaps: {int(residency.stats()['swaps'])}")
+    print(f"frames: {OUT}")
     return 0
 
 

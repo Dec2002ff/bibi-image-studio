@@ -88,7 +88,7 @@ def collect(value, mode: str) -> tuple[Image.Image | None, Image.Image | None]:
 
     mask = masking.mask_from_editor(value)
     if masking.is_empty(mask):
-        LOGGER.info("Режим области выбран, но маска пуста — правлю кадр целиком")
+        LOGGER.info("Region mode is on but the mask is empty; editing the whole image")
         return background.convert("RGBA"), None
 
     return background.convert("RGBA"), mask
@@ -179,7 +179,7 @@ def read_painter(raw, lang: str) -> tuple[dict | None, str | None]:
     try:
         return painter.decode(raw).as_editor_value(), None
     except painter.PayloadError as error:
-        LOGGER.warning("Значение кисти отклонено: %s", error)
+        LOGGER.warning("Brush value rejected: %s", error)
         return None, say("painter_bad_value", lang, error=error)
 
 
@@ -404,7 +404,7 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                 grow_value, feather_value, keep_value, seed_value, current_references, lang, progress,
             )
         except Exception as error:  # noqa: BLE001
-            LOGGER.exception("Обработчик правки не выполнен")
+            LOGGER.exception("Edit handler failed")
             return [], describe_failure(error, lang)
 
     def _apply(

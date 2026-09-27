@@ -36,7 +36,7 @@ def mask_from_editor(value: Mapping[str, Any] | Image.Image) -> Image.Image:
 
     background = value.get("background")
     if background is None:
-        raise ValueError("В значении редактора нет фонового изображения")
+        raise ValueError("Editor value has no background image")
 
     size = background.size
     combined = np.zeros((size[1], size[0]), dtype=np.uint8)

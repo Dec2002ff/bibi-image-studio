@@ -42,10 +42,10 @@ PROMPT = "a wooden desk with a brass lamp and a cup of tea, warm afternoon light
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Разложение шага денойзинга по ядрам CUDA")
+    parser = argparse.ArgumentParser(description="Breakdown of a denoising step by CUDA kernels")
     parser.add_argument("--resolution", type=int, default=1536)
     parser.add_argument("--steps", type=int, default=4,
-                        help="первый шаг — prefill, он из разложения исключается")
+                        help="the first step is prefill and is excluded from the breakdown")
     parser.add_argument("--with-source", action="store_true")
     parser.add_argument("--top", type=int, default=22)
     args = parser.parse_args()
@@ -72,11 +72,11 @@ def main() -> int:
             generator=torch.Generator(device=device).manual_seed(7),
         )
 
-    print("прогрев…", flush=True)
+    print("warming up…", flush=True)
     run(2)
     torch.cuda.synchronize()
 
-    print("профилирую…", flush=True)
+    print("profiling…", flush=True)
     with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
                  record_shapes=False, with_stack=False) as prof:
         run(args.steps)
@@ -100,8 +100,8 @@ def main() -> int:
         json.dumps({"total_cuda_ms": round(total_cuda / 1000, 1), "ops": rows[:60]},
                    ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print(f"\n=== {name}: {args.steps} шагов, всего на карте {total_cuda / 1000:.0f} мс ===")
-    print(f"{'операция':>46} | {'своё, мс':>9} | {'доля':>6} | {'вызовов':>8}")
+    print(f"\n=== {name}: {args.steps} steps, {total_cuda / 1000:.0f} ms on the GPU in total ===")
+    print(f"{'operation':>46} | {'self, ms':>9} | {'share':>6} | {'calls':>8}")
     for row in rows[: args.top]:
         print(f"{row['op']:>46} | {row['self_cuda_ms']:>9} | {row['share_pct']:>5}% | "
               f"{row['calls']:>8}")

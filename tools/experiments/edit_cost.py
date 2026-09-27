@@ -64,16 +64,16 @@ PROMPT = "make the background a quiet autumn park"
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Стоимость правки по пресетам")
+    parser = argparse.ArgumentParser(description="Edit cost per preset")
     parser.add_argument("--steps", type=int, default=4)
     parser.add_argument("--source", type=str, default=None,
-                        help="путь к исходнику; по умолчанию кадр из дымового прогона")
+                        help="path to the source image; defaults to the frame from the smoke run")
     parser.add_argument("--presets", nargs="*", default=list(presets.NAMES))
     parser.add_argument("--budget-seconds", type=float, default=300.0)
     parser.add_argument("--mask", action="store_true",
-                        help="правка по маске: условных изображений два, а не одно")
+                        help="masked edit: two condition images instead of one")
     parser.add_argument("--scales", type=int, nargs="*", default=None,
-                        help="перебрать масштаб условных изображений вместо сравнения с генерацией")
+                        help="sweep the condition image scale instead of comparing with generation")
     args = parser.parse_args()
 
     logging_setup.setup_logging(False)
@@ -81,7 +81,7 @@ def main() -> int:
 
     source_path = Path(args.source) if args.source else config.LOG_DIR / "smoke" / "source.png"
     source = Image.open(source_path).convert("RGB")
-    print(f"исходник {source_path.name} {source.size}\n", flush=True)
+    print(f"source {source_path.name} {source.size}\n", flush=True)
 
     pipe, residency, cache = loader.load(config.MODEL_DIR)
     engine = Generator(pipe, residency, cache, load_styles(config.STYLES_DIR))
@@ -115,9 +115,9 @@ def main() -> int:
         if args.scales:
             # Перебор масштаба условных изображений: кадр при этом обязан
             # остаться пресетным, ради чего рычаг и разделяли.
-            pairs = [(f"масштаб {s}", _replace(request, reference_scale=s)) for s in args.scales]
+            pairs = [(f"scale {s}", _replace(request, reference_scale=s)) for s in args.scales]
         else:
-            pairs = [("правка", request), ("без исходника", plain)]
+            pairs = [("edit", request), ("no source", plain)]
 
         for kind, req in pairs:
             key = f"{name}/{kind}"
@@ -153,15 +153,15 @@ def main() -> int:
             print(f"{key}: {rows[key]}", flush=True)
             _save(rows)
 
-    print("\n=== сводка ===")
-    print(f"{'режим':>28} | {'кадр':>11} | {'с/шаг':>6} | {'пик, ГиБ':>8}")
+    print("\n=== summary ===")
+    print(f"{'mode':>28} | {'frame':>11} | {'s/step':>6} | {'peak, GiB':>9}")
     for key, row in rows.items():
         if not row.get("ok"):
-            print(f"{key:>28} | {row['reason']} | пик {row.get('peak_vram_gib')}")
+            print(f"{key:>28} | {row['reason']} | peak {row.get('peak_vram_gib')}")
             continue
         print(f"{key:>28} | {row['frame']:>11} | {row['seconds_per_step']:>6} | "
-              f"{row['peak_vram_gib']:>8}")
-    print(f"\nкадры: {OUT}")
+              f"{row['peak_vram_gib']:>9}")
+    print(f"\nframes: {OUT}")
     return 0
 
 
@@ -179,7 +179,7 @@ def _watchdog(started: float, budget: float):
 
     def report(_index: int, _step: int, _total: int) -> None:
         if time.perf_counter() - started > budget:
-            raise TimeoutError(f"дольше {budget:.0f} с — режим непрактичен")
+            raise TimeoutError(f"longer than {budget:.0f} s; the mode is impractical")
 
     return report
 

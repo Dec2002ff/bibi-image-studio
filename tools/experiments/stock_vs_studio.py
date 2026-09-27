@@ -112,7 +112,7 @@ def build(arm: str):
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Стоковый пайплайн против нашего")
+    parser = argparse.ArgumentParser(description="Stock pipeline versus ours")
     parser.add_argument("--arm", choices=("stock", "studio"), required=True)
     parser.add_argument("--steps", type=int, default=STEPS)
     args = parser.parse_args()
@@ -149,17 +149,17 @@ def main() -> int:
     print(f"\n{args.arm}: {row}")
     if len(rows) == 2:
         a, b = rows.get("stock", {}), rows.get("studio", {})
-        print("\n=== сводка ===")
+        print("\n=== summary ===")
         for name, r in (("stock", a), ("studio", b)):
-            print(f"{name:>8} | полосы СКО {r.get('stripe_sigma')} | пик {r.get('stripe_peak')} "
-                  f"| столбцов {r.get('bright_columns')} | {r.get('seconds')} с")
+            print(f"{name:>8} | stripe SD {r.get('stripe_sigma')} | peak {r.get('stripe_peak')} "
+                  f"| columns {r.get('bright_columns')} | {r.get('seconds')} s")
         if a.get("stripe_sigma") and b.get("stripe_sigma"):
             ratio = b["stripe_sigma"] / a["stripe_sigma"]
             print()
-            print(f"наш/стоковый: {ratio:.2f}")
-            print("Оба плеча идут через diffusers: этот опыт отвечает только "
-                  "на вопрос «виновато ли то, что мы добавили», и не отвечает "
-                  "на вопрос «виновата ли модель». Независимый контроль — ComfyUI.")
+            print(f"ours/stock: {ratio:.2f}")
+            print("Both arms go through diffusers: this experiment only answers "
+                  "\"is what we added to blame\", not \"is the model to blame\". "
+                  "The independent control is ComfyUI.")
     return 0
 
 

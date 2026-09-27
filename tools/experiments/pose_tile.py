@@ -106,7 +106,7 @@ def pose_error(target: skeleton.Pose, result: skeleton.Pose) -> tuple[float, flo
 
 def main() -> int:
     use_utf8_console()
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description="Experiment: does Qwen-Image 2.1 draw a person from a pose skeleton in a reference.")
     parser.add_argument("--preset", default="Turbo")
     parser.add_argument("--seeds", type=int, nargs="*", default=[1])
     parser.add_argument("--variants", nargs="*", default=list(VARIANTS), choices=list(VARIANTS))
@@ -148,8 +148,8 @@ def main() -> int:
                     direct, mirrored = pose_error(target, found)
                 except detect.NoPersonFound:
                     direct = mirrored = float("nan")
-                print(f"{name:11} {variant:10} seed {seed}: ошибка позы {direct:5.1f} % "
-                      f"(зеркально {mirrored:5.1f} %), {time.time() - started:.0f} с", flush=True)
+                print(f"{name:11} {variant:10} seed {seed}: pose error {direct:5.1f} % "
+                      f"(mirrored {mirrored:5.1f} %), {time.time() - started:.0f} s", flush=True)
                 row.append(image)
         rows.append(row)
 
@@ -159,7 +159,7 @@ def main() -> int:
         for x, image in enumerate(row):
             sheet.paste(image.resize((side, side)), (x * side, y * side))
     sheet.save(WORK / "sheet.png")
-    print(f"лист: {WORK / 'sheet.png'} (столбцы: эталон, скелет, затем варианты по порядку)")
+    print(f"sheet: {WORK / 'sheet.png'} (columns: reference, skeleton, then the variants in order)")
     return 0
 
 

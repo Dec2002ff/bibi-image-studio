@@ -55,6 +55,9 @@ from fooocus_qwen import config, logging_setup  # noqa: E402
 from fooocus_qwen.engine import loader  # noqa: E402
 
 OUT = config.LOG_DIR / "sage-int8"
+# Файл замеров с английскими ключами. Прежний scores.json (русские ключи)
+# не дочитывается: его строки уронили бы опыт на KeyError.
+SCORES = "scores.en.json"
 
 CASES = [
     ("t2i-portrait", 'a close-up portrait of an elderly fisherman with a knitted cap, harbour at dawn, '
@@ -99,7 +102,7 @@ def to_tensor(image: Image.Image) -> torch.Tensor:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="SageAttention и INT8: скорость, память, качество")
+    parser = argparse.ArgumentParser(description="SageAttention and INT8: speed, memory, quality")
     parser.add_argument("--steps", type=int, default=28)
     parser.add_argument("--resolution", type=int, default=1536)
     args = parser.parse_args()
@@ -110,7 +113,7 @@ def main() -> int:
     device = pipe._execution_device
     metric = lpips_model()
     allow_sage_with_full_masks()
-    done = json.loads((OUT / "scores.json").read_text(encoding="utf-8")) if (OUT / "scores.json").exists() else {}
+    done = json.loads((OUT / SCORES).read_text(encoding="utf-8")) if (OUT / SCORES).exists() else {}
 
     def run(prompt: str, source: Path | None) -> tuple[Image.Image, float]:
         condition = [Image.open(source).convert("RGB")] if source else None
@@ -137,7 +140,7 @@ def main() -> int:
         before = torch.cuda.memory_allocated()
         quantize_(pipe.transformer, Int8WeightOnlyConfig())
         torch.cuda.empty_cache()
-        print(f"  INT8: занято {before / 2**30:.2f} → {torch.cuda.memory_allocated() / 2**30:.2f} ГиБ")
+        print(f"  INT8: allocated {before / 2**30:.2f} → {torch.cuda.memory_allocated() / 2**30:.2f} GiB")
 
     variants = [
         ("base", lambda: set_sage(False)),
@@ -161,8 +164,8 @@ def main() -> int:
             image, spent = run(prompt, source)
             image.save(OUT / f"{case}-{variant}.png")
             row = {
-                "секунд": round(spent, 2),
-                "пик_гиб": round(torch.cuda.max_memory_allocated() / 2**30, 2),
+                "seconds": round(spent, 2),
+                "peak_gib": round(torch.cuda.max_memory_allocated() / 2**30, 2),
             }
             if variant == "base":
                 base_images[case] = image
@@ -171,16 +174,16 @@ def main() -> int:
                     row["lpips"] = round(float(metric(to_tensor(image), to_tensor(base_images[case]))), 4)
             rows[f"{case} / {variant}"] = row
             print(f"{case} / {variant}: {row}", flush=True)
-            (OUT / "scores.json").write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+            (OUT / SCORES).write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print("\n=== сводка ===")
-    print(f"{'случай / вариант':>26} | {'сек':>7} | {'выигрыш':>8} | {'пик ГиБ':>7} | {'LPIPS':>6}")
+    print("\n=== summary ===")
+    print(f"{'case / variant':>26} | {'sec':>7} | {'gain':>8} | {'peak GiB':>8} | {'LPIPS':>6}")
     for key, row in rows.items():
         case = key.split(" / ")[0]
-        base = rows[f"{case} / base"]["секунд"]
-        gain = 100 * (base - row["секунд"]) / base
-        print(f"{key:>26} | {row['секунд']:>7} | {gain:>7.1f}% | {row['пик_гиб']:>7} | {row.get('lpips', '—'):>6}")
-    print(f"\njson: {OUT / 'scores.json'}")
+        base = rows[f"{case} / base"]["seconds"]
+        gain = 100 * (base - row["seconds"]) / base
+        print(f"{key:>26} | {row['seconds']:>7} | {gain:>7.1f}% | {row['peak_gib']:>8} | {row.get('lpips', '—'):>6}")
+    print(f"\njson: {OUT / SCORES}")
     return 0
 
 

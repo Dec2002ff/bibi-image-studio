@@ -51,7 +51,7 @@ class AppConfig:
 
     host: str = DEFAULT_HOST
     port: int = DEFAULT_PORT
-    lang: str = "ru"
+    lang: str = "en"
     pin_memory: bool = True
     preload: bool = True
     preset: str = "MiddleQuality"
@@ -77,26 +77,26 @@ def ensure_directories() -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="fooocus_qwen", description="Оболочка Qwen-Image-2.1")
-    parser.add_argument("--host", default=DEFAULT_HOST, help="адрес прослушивания")
-    parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="порт прослушивания")
-    parser.add_argument("--lang", choices=("ru", "en"), default="ru", help="язык интерфейса")
-    parser.add_argument("--preset", choices=PRESET_NAMES, default="MiddleQuality", help="пресет качества")
-    parser.add_argument("--verbose", action="store_true", help="подробный журнал")
+    parser = argparse.ArgumentParser(prog="fooocus_qwen", description="Qwen-Image-2.1 web UI")
+    parser.add_argument("--host", default=DEFAULT_HOST, help="address to listen on")
+    parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="port to listen on")
+    parser.add_argument("--lang", choices=("en", "ru"), default="en", help="interface language")
+    parser.add_argument("--preset", choices=PRESET_NAMES, default="MiddleQuality", help="quality preset")
+    parser.add_argument("--verbose", action="store_true", help="verbose logging")
     # Закрепление памяти ускоряет переброску весов, но занимает десятки гигабайт
     # неперемещаемой оперативной памяти — на чужой машине это может не подойти.
     parser.add_argument(
         "--no-pin-memory",
         dest="pin_memory",
         action="store_false",
-        help="не закреплять копии весов в оперативной памяти",
+        help="do not pin weight copies in RAM",
     )
     parser.set_defaults(pin_memory=True)
     parser.add_argument(
         "--no-preload",
         dest="preload",
         action="store_false",
-        help="не загружать модель в фоне при старте (первая генерация будет дольше)",
+        help="do not load the model in the background at startup (the first generation will take longer)",
     )
     parser.set_defaults(preload=True)
     # Браузер открывают скрипты запуска (run.ps1, run.sh), а не сам модуль:
@@ -105,7 +105,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--open-browser",
         dest="open_browser",
         action="store_true",
-        help="открыть интерфейс в браузере, когда сервер будет готов",
+        help="open the interface in a browser once the server is ready",
     )
     # Пара к предыдущему: скрипты запуска ставят --open-browser первым, и
     # этот ключ, пришедший от пользователя следом, его перебивает —
@@ -114,12 +114,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-open-browser",
         dest="open_browser",
         action="store_false",
-        help="не открывать браузер при запуске",
+        help="do not open a browser at startup",
     )
     parser.set_defaults(open_browser=False)
-    parser.add_argument("--prompt", help="сгенерировать одно изображение без интерфейса и выйти")
-    parser.add_argument("--out", help="куда сохранить результат режима --prompt")
-    parser.add_argument("--selftest", action="store_true", help="проверить готовность окружения и выйти")
+    parser.add_argument("--prompt", help="generate a single image without the interface and exit")
+    parser.add_argument("--out", help="where to save the --prompt result")
+    parser.add_argument("--selftest", action="store_true", help="check that the environment is ready and exit")
     # Два режима установки. Логика у них общая для Windows и Linux, поэтому
     # живёт здесь, а install.ps1 и install.sh только зовут её флагом: то же
     # самое, написанное дважды на двух языках оболочки, разъезжается, и
@@ -128,19 +128,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--fetch-model",
         dest="fetch_model",
         action="store_true",
-        help="скачать недостающие веса модели и выйти",
+        help="download missing model weights and exit",
     )
     parser.add_argument(
         "--setup-performance",
         dest="setup_performance",
         action="store_true",
-        help="спросить точность весов (bf16/INT8) и SageAttention, записать выбор и выйти",
+        help="ask for weight precision (bf16/INT8) and SageAttention, save the choice and exit",
     )
     parser.add_argument(
         "--setup-llm",
         dest="setup_llm",
         action="store_true",
-        help="спросить адрес и токен языковой модели, записать их и выйти",
+        help="ask for the language model address and token, save them and exit",
     )
     return parser
 

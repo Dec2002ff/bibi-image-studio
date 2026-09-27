@@ -63,8 +63,8 @@ class TurboAdapter:
 
         missing = fetch.missing_extra(self._dir, fetch.TURBO_FILES)
         if missing:
-            raise FileNotFoundError(f"Нет весов turbo в {self._dir}: {', '.join(missing)}")
-        LOGGER.info("Подключаю адаптер turbo из %s", self._dir)
+            raise FileNotFoundError(f"Turbo weights missing in {self._dir}: {', '.join(missing)}")
+        LOGGER.info("Attaching turbo adapter from %s", self._dir)
         self._base_scheduler = self._pipe.scheduler
         self._residency.restage_transformer(self._attach)
         self._turbo_scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(str(self._dir), subfolder="scheduler")

@@ -201,7 +201,7 @@ def build(cfg: config.AppConfig, return_studio: bool = False):
         # старте и избавляет от наполовину переведённой полосы вкладок.
         demo.load(None, None, None, js=WARM_UP_TABS)
         # Подсказки к значкам ячеек референсов: у gr.Button нет своего title.
-        demo.load(None, language, None, js=reference_tools.TITLES_JS)
+        demo.load(None, None, None, js=reference_tools.TITLES_JS)
 
         # Регистрация именно здесь, после сборки вкладок: до неё
         # ``localizer.components`` ещё пуст, и клик обновлял бы одну кнопку.
@@ -210,7 +210,7 @@ def build(cfg: config.AppConfig, return_studio: bool = False):
             language,
             [language, language_button, *localizer.components],
             queue=False,
-        ).then(None, language, None, js=reference_tools.TITLES_JS)
+        ).then(None, None, None, js=reference_tools.TITLES_JS)
 
     return (demo, studio) if return_studio else demo
 
@@ -246,14 +246,14 @@ def open_in_browser(url: str) -> bool:
     уронить работающий сервер из-за ненайденного браузера значило бы
     поменять местами главное и второстепенное.
     """
-    LOGGER.info("Открываю интерфейс в браузере: %s", url)
+    LOGGER.info("Opening the UI in the browser: %s", url)
     try:
         opened = bool(webbrowser.open(url, new=2))
     except Exception as error:  # noqa: BLE001 — причина важна, тип нет
-        LOGGER.warning("Не удалось открыть браузер (%s). Откройте вручную: %s", error, url)
+        LOGGER.warning("Failed to open the browser (%s). Open manually: %s", error, url)
         return False
     if not opened:
-        LOGGER.warning("Браузер не открылся. Откройте вручную: %s", url)
+        LOGGER.warning("Browser did not open. Open manually: %s", url)
     return opened
 
 
@@ -273,7 +273,7 @@ def start(cfg: config.AppConfig, prepare=None) -> tuple[gr.Blocks, Studio]:
     # В Gradio 6 параметр css переехал из конструктора Blocks в launch() — передача
     # его в конструктор всё ещё работает, но с предупреждением об устаревании.
     css = stylesheet()
-    LOGGER.info("Интерфейс на http://%s:%s", cfg.host, cfg.port)
+    LOGGER.info("UI at http://%s:%s", cfg.host, cfg.port)
     # В Gradio 6.5.1 параметра show_api больше нет ни в Blocks, ни в launch() —
     # он был убран выше по течению. Ссылку «Use via API» и так прячет footer
     # в style.css, так что отдельно отключать нечего.

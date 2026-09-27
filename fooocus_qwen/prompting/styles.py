@@ -38,7 +38,7 @@ def load_styles(directory: Path) -> dict[str, Style]:
         try:
             entries = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as error:
-            LOGGER.warning("Файл стилей %s пропущен: %s", path.name, error)
+            LOGGER.warning("Styles file %s skipped: %s", path.name, error)
             continue
         for entry in entries:
             name = entry.get("name", "").strip()
@@ -73,7 +73,7 @@ def apply_styles(
     for name in names:
         style = catalogue.get(name)
         if style is None:
-            LOGGER.warning("Стиль %r не найден в каталоге и пропущен", name)
+            LOGGER.warning("Style %r not found in the catalog, skipped", name)
             continue
         if PLACEHOLDER in style.prompt:
             positives.append(style.prompt.replace(PLACEHOLDER, prompt))

@@ -73,7 +73,7 @@ class Overrun(RuntimeError):
     """Режим не уложился в бюджет времени и прерван на полушаге."""
 
     def __init__(self, steps_done: int, elapsed: float) -> None:
-        super().__init__(f"прервано на шаге {steps_done} через {elapsed:.0f} с")
+        super().__init__(f"aborted at step {steps_done} after {elapsed:.0f} s")
         self.steps_done = steps_done
         self.elapsed = elapsed
 
@@ -122,7 +122,7 @@ def attempt(pipe, images: list[Image.Image], scale: int, steps: int, budget: flo
         torch.cuda.empty_cache()
         return {
             "ok": False,
-            "reason": "дольше бюджета",
+            "reason": "over budget",
             "seconds_per_step": round(stop.elapsed / max(stop.steps_done, 1), 1),
             "steps_done": stop.steps_done,
             "peak_vram_gib": peak(),
@@ -130,7 +130,7 @@ def attempt(pipe, images: list[Image.Image], scale: int, steps: int, budget: flo
     except torch.cuda.OutOfMemoryError as error:
         pipe._current_timestep = None
         torch.cuda.empty_cache()
-        return {"ok": False, "reason": "нехватка видеопамяти", "detail": str(error)[:80]}
+        return {"ok": False, "reason": "out of video memory", "detail": str(error)[:80]}
 
     elapsed = time.perf_counter() - started
     image = result.images[0]
@@ -144,15 +144,15 @@ def attempt(pipe, images: list[Image.Image], scale: int, steps: int, budget: flo
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Влияние output_resolution на память при референсах")
-    parser.add_argument("--count", type=int, default=5, help="сколько референсов подавать")
+    parser = argparse.ArgumentParser(description="Effect of output_resolution on memory with references")
+    parser.add_argument("--count", type=int, default=5, help="how many references to pass")
     parser.add_argument("--scales", type=int, nargs="*", default=[512, 768, 1024, 1536],
-                        help="по возрастанию: дешёвые режимы должны отвечать первыми")
+                        help="in ascending order: cheap modes should answer first")
     parser.add_argument("--steps", type=int, default=8)
     parser.add_argument("--budget-seconds", type=float, default=240.0,
-                        help="дольше — режим непрактичен, прерываем на текущем шаге")
+                        help="longer means the mode is impractical; abort at the current step")
     parser.add_argument("--fresh", action="store_true",
-                        help="начать таблицу заново, не подхватывая прежние измерения")
+                        help="start the table afresh, ignoring earlier measurements")
     args = parser.parse_args()
 
     def save(rows: dict) -> None:
@@ -162,7 +162,7 @@ def main() -> int:
 
     logging_setup.setup_logging(False)
     pipe, residency, _cache = loader.load(config.MODEL_DIR)
-    print(f"кадр держим {FRAME}x{FRAME}, референсов {args.count}, шагов {args.steps}\n", flush=True)
+    print(f"frame fixed at {FRAME}x{FRAME}, references {args.count}, steps {args.steps}\n", flush=True)
 
     # Уже измеренное не теряется при запуске одного режима отдельно: числа по
     # каждому масштабу получают в отдельном процессе (см. докстроку), и без
@@ -173,7 +173,7 @@ def main() -> int:
         rows.update(json.loads(previous.read_text(encoding="utf-8")))
 
     for scale in args.scales:
-        print(f"-- масштаб референсов {scale} --", flush=True)
+        print(f"-- reference scale {scale} --", flush=True)
 
         def stuck(_scale=scale) -> None:
             """Шаг не вернул управление: записать это и выйти.
@@ -183,12 +183,12 @@ def main() -> int:
             """
             rows[str(_scale)] = {
                 "ok": False,
-                "reason": "шаг не завершился в пределах бюджета",
+                "reason": "the step did not finish within the budget",
                 "budget_seconds": args.budget_seconds,
                 "peak_vram_gib": round(torch.cuda.max_memory_allocated() / 2**30, 2),
             }
             save(rows)
-            print(f"   завис на одном шаге дольше {args.budget_seconds:.0f} с — выходим",
+            print(f"   stuck on one step for longer than {args.budget_seconds:.0f} s; exiting",
                   flush=True)
             os._exit(3)
 
@@ -205,18 +205,18 @@ def main() -> int:
         if not outcome["ok"]:
             # Масштабы идут по возрастанию: если этот уже не тянет, больший
             # тем более не потянет, и мерить его — только жечь время.
-            print("   дальше не растём, больший масштаб тем более не пройдёт", flush=True)
+            print("   not going higher: a larger scale will not pass either", flush=True)
             break
 
-    print("\n=== сводка ===")
-    print(f"{'масштаб':>8} | {'кадр':>9} | {'с/шаг':>6} | {'пик, ГиБ':>8} | итог")
+    print("\n=== summary ===")
+    print(f"{'scale':>8} | {'frame':>9} | {'s/step':>6} | {'peak, GiB':>9} | verdict")
     for scale, row in sorted(rows.items(), key=lambda item: int(item[0])):
         frame = row.get("frame", "—")
         per_step = row.get("seconds_per_step", "—")
         peak = row.get("peak_vram_gib", "—")
-        verdict = "ок" if row["ok"] else row["reason"]
-        print(f"{scale:>8} | {frame:>9} | {per_step:>6} | {peak:>8} | {verdict}")
-    print(f"\nперестановок энкодера: {int(residency.stats()['swaps'])}")
+        verdict = "ok" if row["ok"] else row["reason"]
+        print(f"{scale:>8} | {frame:>9} | {per_step:>6} | {peak:>9} | {verdict}")
+    print(f"\nencoder swaps: {int(residency.stats()['swaps'])}")
     return 0
 
 
