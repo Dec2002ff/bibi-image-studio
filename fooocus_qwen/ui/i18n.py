@@ -97,6 +97,11 @@ T: dict[str, tuple[str, str]] = {
     "modal_close": ("Закрыть", "Close"),
     "modal_cancel": ("Отмена", "Cancel"),
     "modal_accept": ("Принять", "Accept"),
+    # Просмотр в полном размере (ui/viewer.py) — подсказка в его нижней строке.
+    "viewer_hint": (
+        "клик — 100 % или вписать · перетаскивание — сдвиг · ← → — другие · Esc — закрыть",
+        "click: 100% or fit · drag: pan · ← →: others · Esc: close",
+    ),
     "reference_clear": ("Очистить референсы", "Clear references"),
     "boost": ("AI буст", "AI boost"),
     "boost_info": (
@@ -162,6 +167,8 @@ PAINTER: dict[str, tuple[str, str]] = {
     "painter_eraser": ("Ластик (E); правая кнопка мыши стирает всегда",
                        "Eraser (E); the right mouse button always erases"),
     "painter_size": ("Размер", "Size"),
+    "painter_colour": ("Свой цвет", "Custom colour"),
+    "painter_opacity": ("Непрозрачность", "Opacity"),
     "painter_undo": ("Отменить (Ctrl+Z)", "Undo (Ctrl+Z)"),
     "painter_redo": ("Повторить (Ctrl+Y)", "Redo (Ctrl+Y)"),
     "painter_invert": ("Инвертировать разметку", "Invert the marks"),

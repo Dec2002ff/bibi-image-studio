@@ -71,6 +71,7 @@ class MaskPainter(gr.HTML):
         region: str = "mask",
         labels: dict[str, list[str]] | None = None,
         palette: list[str] | None = None,
+        free_colour: bool = False,
         **kwargs: Any,
     ) -> None:
         # Gradio пересоздаёт компонент при обновлении свойств и передаёт
@@ -87,6 +88,9 @@ class MaskPainter(gr.HTML):
             region=region,
             labels=labels or {},
             palette=list(palette or ["#ff0000"]),
+            # Свой цвет и непрозрачность кисти (окно эскиза). В маске их нет:
+            # маска бинаризуется по альфе 128.
+            free_colour=bool(free_colour),
             **kwargs,
         )
 

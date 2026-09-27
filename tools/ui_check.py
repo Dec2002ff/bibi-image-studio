@@ -954,6 +954,170 @@ def scenario_tools(browser, url, report: Report, fake: FakeGenerator, samples: P
     report.check(not errors, "no page errors" + (f": {errors[:2]}" if errors else ""))
 
 
+VIEWER = "window.__qsViewer"
+
+
+def viewer_state(page) -> dict:
+    return page.evaluate(f"() => {VIEWER} ? {VIEWER}.state() : null")
+
+
+def wait_viewer(page, opened: bool, timeout: int = 10000) -> None:
+    page.wait_for_function(f"() => {VIEWER} && {VIEWER}.state().open === {str(opened).lower()}", timeout=timeout)
+
+
+def scenario_viewer(browser, url, report: Report, fake: FakeGenerator, samples: Path) -> None:
+    """Просмотр в полном размере: результат, референс, результат правки, галерея.
+
+    Клик по большой картинке результата раньше листал галерею, по картинке в
+    ячейке референса — открывал выбор файла. Теперь оба открывают просмотр;
+    окно выбора файла при этом открываться не должно.
+    """
+    print("full-size viewer:")
+    page, errors = fresh_page(browser, url)
+    choosers: list = []
+    page.on("filechooser", lambda chooser: choosers.append(chooser))
+
+    for box in page.locator("textarea").all():
+        if box.is_visible():
+            box.fill("a gray square")
+            break
+    before = len(fake.requests)
+    click_text(page, "Generate")
+    fake.wait(before + 1)
+    page.wait_for_function("() => document.querySelector('.qs-board .preview .media-button img')", timeout=20000)
+    page.wait_for_timeout(500)
+    page.locator(".qs-board .preview .media-button img").first.click()
+    wait_viewer(page, True)
+    state = viewer_state(page)
+    report.check(state["mode"] == "fit" and state["natural"] == [256, 256] and state["count"] == 1,
+                 f"result click opens the viewer, fitted, full file: {state['natural']}")
+    page.locator(".qv-image").click()
+    page.wait_for_function(f"() => {VIEWER}.state().mode === 'actual'", timeout=5000)
+    page.locator(".qv-image").click()
+    page.wait_for_function(f"() => {VIEWER}.state().mode === 'fit'", timeout=5000)
+    report.check(True, "click on the image toggles 100% and fit")
+    shot = samples.parent / "viewer.png"
+    page.screenshot(path=str(shot))
+    print(f"  viewer screenshot: {shot}")
+    page.keyboard.press("Escape")
+    wait_viewer(page, False)
+    report.check(page.locator(".qs-board .preview .media-button img").count() == 1,
+                 "Esc closes it; the result stays in preview (the click did not flip the gallery)")
+
+    # Референс: просмотр вместо выбора файла.
+    page.locator(".qs-refslot").nth(0).locator('input[type="file"]').set_input_files(
+        str(sample_image(samples, 300, 200)))
+    wait_loaded(page, [0])
+    choosers.clear()
+    page.locator(".qs-refslot img").first.click()
+    wait_viewer(page, True)
+    page.wait_for_timeout(500)
+    report.check(viewer_state(page)["natural"] == [300, 200] and not choosers,
+                 f"reference click opens the viewer, no file dialog: {viewer_state(page)['natural']}, dialogs {len(choosers)}")
+    page.mouse.click(8, 400)  # фон
+    wait_viewer(page, False)
+    report.check(True, "clicking the backdrop closes it")
+
+    # Результат правки.
+    open_tab(page, 1)
+    load_into_painter(page, sample_image(samples, 640, 480))
+    before = len(fake.requests)
+    apply_edit(page)
+    fake.wait(before + 1)
+    page.wait_for_function("() => document.querySelector('.qs-slot-result .preview .media-button img')", timeout=20000)
+    page.wait_for_timeout(500)
+    page.locator(".qs-slot-result .preview .media-button img").first.click()
+    wait_viewer(page, True)
+    report.check(viewer_state(page)["natural"] == [640, 480], f"edit result opens too: {viewer_state(page)['natural']}")
+    page.locator(".qv-close").click()
+    wait_viewer(page, False)
+
+    # Галерея: одиночный клик — карточка, двойной — просмотр.
+    open_tab(page, 2)
+    page.wait_for_timeout(1200)
+    thumb = page.locator(".qs-browse img").first
+    thumb.click()
+    page.wait_for_timeout(600)
+    report.check(not viewer_state(page)["open"], "gallery: a single click still opens the card, not the viewer")
+    thumb.dblclick()
+    wait_viewer(page, True)
+    distinct = page.evaluate(
+        "() => new Set([...document.querySelectorAll('.qs-browse .thumbnail-item img')].map(i => i.src)).size")
+    report.check(viewer_state(page)["count"] == distinct > 0,
+                 f"gallery: double click opens the viewer, each image listed once: "
+                 f"{viewer_state(page)['count']} of {distinct}")
+    page.keyboard.press("Escape")
+    wait_viewer(page, False)
+    report.check(not errors, "no page errors" + (f": {errors[:2]}" if errors else ""))
+    page.close()
+
+
+SKETCH_HOST_JS = """(id) => [...document.querySelectorAll('#' + id + ' *')].find(n => n.shadowRoot).shadowRoot"""
+
+
+def painter_controls(page, painter_id: str) -> dict:
+    """Видны ли у кисти свой цвет и непрозрачность."""
+    return page.evaluate(f"""(id) => {{
+        const root = ({SKETCH_HOST_JS})(id);
+        return {{colour: !root.querySelector('.qp-colour').hidden, alpha: !root.querySelector('.qp-alpha').hidden}};
+    }}""", painter_id)
+
+
+def scenario_sketch_colour(browser, url, report: Report, fake: FakeGenerator, samples: Path) -> None:
+    """Эскиз: свой цвет и полупрозрачная кисть; у маски правки их нет.
+
+    Мазок идёт туда и обратно по одному месту: полупрозрачный мазок обязан
+    лечь ровно — на стыках своих отрезков и на самоперекрытии не темнеть.
+    """
+    print("sketch colour and opacity:")
+    page, errors = fresh_page(browser, url)
+    page.locator(".qs-refsketch:visible").nth(0).click()
+    page.wait_for_function(
+        "() => (window.__qsPainters || {})['qs-sketch-painter']?.state().width > 0", timeout=20000
+    )
+    controls = painter_controls(page, "qs-sketch-painter")
+    report.check(controls == {"colour": True, "alpha": True}, f"sketch has a colour picker and opacity: {controls}")
+    page.evaluate(f"""(id) => {{
+        const root = ({SKETCH_HOST_JS})(id);
+        const colour = root.querySelector('.qp-colour-input');
+        colour.value = '#ff0000';
+        colour.dispatchEvent(new Event('input', {{bubbles: true}}));
+        const alpha = root.querySelector('.qp-alpha-range');
+        alpha.value = '50';
+        alpha.dispatchEvent(new Event('input', {{bubbles: true}}));
+    }}""", "qs-sketch-painter")
+    state = page.evaluate("() => window.__qsPainters['qs-sketch-painter'].state()")
+    report.check(state["color"] == "#ff0000" and state["alpha"] == 0.5,
+                 f"custom colour and 50% opacity chosen: {state['color']}, {state['alpha']}")
+    stroke(page, [(0.2, 0.5), (0.8, 0.5), (0.2, 0.5)], painter="qs-sketch-painter")
+    click_text(page, "Accept")
+    wait_loaded(page, [0])
+
+    for box in page.locator("textarea").all():
+        if box.is_visible():
+            box.fill("a sketch")
+            break
+    count = len(fake.requests)
+    click_text(page, "Generate")
+    request = fake.wait(count + 1)
+    pixels = np.asarray(request.references[0].convert("RGB")).astype(int)
+    middle, corner = pixels[512, 512], pixels[100, 100]
+    report.check(abs(middle[0] - 255) <= 6 and all(abs(c - 128) <= 12 for c in middle[1:]),
+                 f"50% red over white, even where the stroke overlaps itself: {middle.tolist()}")
+    report.check(corner.tolist() == [255, 255, 255], f"canvas stays white: {corner.tolist()}")
+
+    # У кисти маски на правке — ни своего цвета, ни прозрачности.
+    open_tab(page, 1)
+    load_into_painter(page, sample_image(samples, 320, 240))
+    page.get_by_label("Annotation", exact=True).check()
+    page.wait_for_timeout(500)
+    controls = painter_controls(page, PAINTER)
+    report.check(controls == {"colour": False, "alpha": False},
+                 f"the edit brush (annotation mode) has neither: {controls}")
+    report.check(not errors, "no page errors" + (f": {errors[:2]}" if errors else ""))
+    page.close()
+
+
 def scenario_performance(browser, url, report: Report, fake: FakeGenerator) -> None:
     """Секция «Производительность»: состояние, точность, SageAttention на лету."""
     print("performance:")
@@ -1021,7 +1185,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Browser check of the interface")
     parser.add_argument("--port", type=int, default=7899)
     parser.add_argument("--only", nargs="*", default=None,
-                        help="layout language painter annotation outpaint latency paste gallery send references tools performance secret")
+                        help="layout language painter annotation outpaint latency paste gallery send references tools viewer sketch performance secret")
     args = parser.parse_args()
 
     from playwright.sync_api import sync_playwright
@@ -1069,6 +1233,8 @@ def main() -> int:
         "send": lambda b, r: scenario_send(b, url, r, fake),
         "references": lambda b, r: scenario_references(b, url, r, fake, samples),
         "tools": lambda b, r: scenario_tools(b, url, r, fake, samples),
+        "viewer": lambda b, r: scenario_viewer(b, url, r, fake, samples),
+        "sketch": lambda b, r: scenario_sketch_colour(b, url, r, fake, samples),
         "performance": lambda b, r: scenario_performance(b, url, r, fake),
         "secret": lambda b, r: scenario_secret(b, url, r),
     }

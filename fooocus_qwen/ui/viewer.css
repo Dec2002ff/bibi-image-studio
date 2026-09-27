@@ -1,0 +1,89 @@
+/* Просмотр изображения в полном размере (ui/viewer.py).
+
+   Узел просмотра вставляется прямо в <body>, вне .gradio-container: Gradio
+   приписывает к селекторам style.css свою область, и правила до узла вне
+   неё не дошли бы. Поэтому стили — свои, с префиксом qv-, и вставляет их
+   сам скрипт просмотра, как кисть вставляет свои в теневой корень. */
+
+.qv-root {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    overflow: auto;
+    background: rgba(8, 10, 14, 0.9);
+    overscroll-behavior: contain;
+}
+
+/* Скрытие главнее режимов: правило режима той же специфичности стоит ниже и
+   иначе победило бы — невидимый слой на весь экран перехватывал бы клики. */
+.qv-root[hidden] { display: none !important; }
+
+/* Вписать: картинка по центру, целиком в окне. */
+.qv-root[data-mode="fit"] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.qv-root[data-mode="fit"] .qv-image {
+    max-width: calc(100vw - 48px);
+    max-height: calc(100vh - 88px);
+    cursor: zoom-in;
+}
+
+/* 100 %: пиксель картинки — пиксель экрана, окно прокручивается. Блоком, а
+   не флексом: центрирование флексом срезало бы у крупной картинки левый и
+   верхний край, до которых прокрутка уже не достаёт. */
+.qv-root[data-mode="actual"] { display: block; padding: 24px; }
+
+.qv-root[data-mode="actual"] .qv-image {
+    display: block;
+    margin: 0 auto;
+    max-width: none;
+    max-height: none;
+    cursor: grab;
+}
+
+.qv-root[data-dragging="true"] .qv-image { cursor: grabbing; }
+
+.qv-image {
+    user-select: none;
+    -webkit-user-drag: none;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+    background: repeating-conic-gradient(#3a3a3a 0 25%, #2c2c2c 0 50%) 0 0 / 16px 16px;
+}
+
+.qv-bar {
+    position: fixed;
+    left: 50%;
+    bottom: 14px;
+    transform: translateX(-50%);
+    max-width: calc(100vw - 32px);
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.6);
+    color: #e5e7eb;
+    font: 13px/1.4 system-ui, sans-serif;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+}
+
+.qv-close {
+    position: fixed;
+    top: 12px;
+    right: 14px;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    color: #f3f4f6;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.qv-close:hover { background: rgba(255, 255, 255, 0.18); }
+.qv-close:focus-visible { outline: 2px solid #f97316; outline-offset: 2px; }

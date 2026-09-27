@@ -71,7 +71,9 @@ shows the rewritten text before you generate, so you can review or edit it.
 Whatever is in the *Rewritten prompt* box is what the model receives.
 **Send to editor** puts the selected result into the mask brush and opens the
 Edit tab; **Send to references** puts it into the first free reference cell. Both buttons
-also sit under the Edit tab's result.
+also sit under the Edit tab's result. Click the result (or a filled reference
+cell) to view it full size: click again for 100%, drag to pan, arrow keys for
+the other results, Esc to close.
 
 ![Generate tab: a short prompt, its AI-boosted rewrite and the result](docs/images/generate.webp)
 
@@ -122,6 +124,7 @@ the original pixels stay untouched.
 
 Each result is saved with its parameters inside the PNG. Select an image to
 see them, then reuse them on the Generate tab or open the image in the editor.
+Double-click a thumbnail to view it full size.
 
 ![Gallery with the parameter card of the selected image](docs/images/gallery.webp)
 
@@ -297,7 +300,8 @@ catalogue's style (about 13 s with Turbo if its adapter is already downloaded,
 LowQuality otherwise).
 
 **Sketches.** The pencil icon opens a white canvas with the same brush as the Edit tab:
-palette, size, eraser, undo/redo, zoom. **Accept** puts the drawing into the
+palette plus a custom colour picker, brush opacity, size, eraser, undo/redo,
+zoom. A translucent stroke lays down evenly, even where it crosses itself. **Accept** puts the drawing into the
 cell, **Cancel** closes the window.
 
 More references use more memory. **Reference detail** (under Advanced) sets

@@ -9,7 +9,7 @@ from pathlib import Path
 import gradio as gr
 
 from .. import config
-from . import layout, reference_tools, tab_edit, tab_gallery, tab_generate, tab_settings
+from . import layout, reference_tools, tab_edit, tab_gallery, tab_generate, tab_settings, viewer
 from .i18n import LANGUAGES, Localizer, pick
 from .state import Studio
 
@@ -202,6 +202,8 @@ def build(cfg: config.AppConfig, return_studio: bool = False):
         demo.load(None, None, None, js=WARM_UP_TABS)
         # Подсказки к значкам ячеек референсов: у gr.Button нет своего title.
         demo.load(None, None, None, js=reference_tools.TITLES_JS)
+        # Просмотр в полном размере: клик по результату и по референсу.
+        demo.load(None, None, None, js=viewer.script())
 
         # Регистрация именно здесь, после сборки вкладок: до неё
         # ``localizer.components`` ещё пуст, и клик обновлял бы одну кнопку.

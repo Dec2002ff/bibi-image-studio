@@ -302,5 +302,25 @@ def test_each_stroke_draws_only_its_new_segment():
     всего слоя допустима только в отмене — там, где она и нужна.
     """
     extend = re.search(r"function extendStroke\(event\) \{(.*?)\n\}", SCRIPT, re.S).group(1)
-    assert "segment(layerCtx, stroke, stroke.last, p)" in extend
+    assert "segment(target, stroke, stroke.last, p)" in extend
+    assert "const target = strokeTarget(stroke)" in extend
     assert "redraw(" not in extend and "replayStroke(" not in extend
+
+
+def test_a_translucent_stroke_goes_through_the_live_canvas():
+    """Полупрозрачный мазок рисуется непрозрачно на живом холсте и сливается в
+    слой один раз — иначе стыки отрезков темнели бы внутри одного мазка."""
+    target = re.search(r"function strokeTarget\(stroke\) \{(.*?)\n\}", SCRIPT, re.S).group(1)
+    assert "stroke.alpha < 1 ? liveCtx : layerCtx" in target
+    end = re.search(r"function endStroke\(\) \{(.*?)\n\}", SCRIPT, re.S).group(1)
+    assert "layerCtx.globalAlpha = stroke.alpha" in end and "layerCtx.drawImage(ui.live, 0, 0)" in end
+    replay = re.search(r"function replayStroke\(ctx, stroke\) \{(.*?)\n\}", SCRIPT, re.S).group(1)
+    assert "ctx.globalAlpha = alpha" in replay, "отмена перерисовывает мазок с его прозрачностью"
+
+
+def test_free_colour_is_only_for_the_sketch():
+    """Свой цвет и непрозрачность — только в окне эскиза; маска их не получает."""
+    begin = re.search(r"function beginStroke\(event, erase\) \{(.*?)\n\}", SCRIPT, re.S).group(1)
+    assert "FREE_COLOUR && state.region === 'annotation' && !erase ? state.alpha : 1" in begin
+    assert component.MaskPainter(region="mask").props["free_colour"] is False
+    assert component.MaskPainter(free_colour=True).props["free_colour"] is True

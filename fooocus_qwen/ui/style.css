@@ -381,8 +381,10 @@ footer { display: none !important; }
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35) !important;
 }
 
+/* Шире обычной: у кисти эскиза на панели ещё свой цвет и непрозрачность, и в
+   1100 px панель переносилась на вторую строку. */
 .qs-sketchbox {
-    width: min(1100px, 94vw) !important;
+    width: min(1240px, 94vw) !important;
 }
 
 .qs-modaltitle * {

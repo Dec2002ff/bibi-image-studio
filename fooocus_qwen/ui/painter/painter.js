@@ -26,6 +26,10 @@ const shadow = element.shadowRoot || element.attachShadow({ mode: 'open' });
 
 const LABELS = props.labels || {};
 const PALETTE = Array.isArray(props.palette) && props.palette.length ? props.palette : ['#ff0000'];
+// Свой цвет и непрозрачность кисти — для эскиза. В маске их нет намеренно:
+// маска бинаризуется по альфе 128, и полупрозрачный мазок молча пропадал бы
+// из неё или попадал целиком — в зависимости от непрозрачности.
+const FREE_COLOUR = Boolean(props.free_colour);
 const MASK_COLOR = '#ff2d55';
 const MIN_SIZE = 1;
 const MAX_SIZE = 600;
@@ -67,6 +71,14 @@ shadow.innerHTML = `
       <output class="qp-size-value"></output>
     </label>
     <div class="qp-group qp-palette" data-needs-image></div>
+    <label class="qp-colour" data-needs-image data-tip="painter_colour" hidden>
+      <input type="color" class="qp-colour-input" value="#000000">
+    </label>
+    <label class="qp-size qp-alpha" data-needs-image hidden>
+      <span class="qp-size-label" data-text="painter_opacity"></span>
+      <input type="range" class="qp-alpha-range" min="5" max="100" step="5" value="100">
+      <output class="qp-size-value qp-alpha-value"></output>
+    </label>
     <div class="qp-group" data-needs-image>
       <button class="qp-btn" data-act="undo" data-tip="painter_undo">${icon('undo')}</button>
       <button class="qp-btn" data-act="redo" data-tip="painter_redo">${icon('redo')}</button>
@@ -88,6 +100,7 @@ shadow.innerHTML = `
     <div class="qp-view">
       <canvas class="qp-image"></canvas>
       <canvas class="qp-layer"></canvas>
+      <canvas class="qp-live"></canvas>
     </div>
     <div class="qp-cursor" hidden></div>
     <button class="qp-empty" data-act="open">
@@ -110,10 +123,13 @@ const ui = {
     image: $('.qp-image'), layer: $('.qp-layer'), cursor: $('.qp-cursor'),
     range: $('.qp-size-range'), sizeValue: $('.qp-size-value'), zoom: $('.qp-zoom'),
     palette: $('.qp-palette'), notice: $('.qp-notice'), busy: $('.qp-busy'),
-    message: $('.qp-message'), file: $('.qp-file'),
+    message: $('.qp-message'), file: $('.qp-file'), live: $('.qp-live'),
+    colour: $('.qp-colour'), colourInput: $('.qp-colour-input'),
+    alpha: $('.qp-alpha'), alphaRange: $('.qp-alpha-range'), alphaValue: $('.qp-alpha-value'),
 };
 const imageCtx = ui.image.getContext('2d');
 const layerCtx = ui.layer.getContext('2d');
+const liveCtx = ui.live.getContext('2d');
 
 /* --- состояние ----------------------------------------------------------- */
 
@@ -121,6 +137,7 @@ const state = {
     region: props.region || 'mask',
     tool: 'brush',
     color: PALETTE[0],
+    alpha: 1,            // непрозрачность кисти (только при FREE_COLOUR)
     size: 24,
     width: 0,
     height: 0,
@@ -197,6 +214,17 @@ function refreshTools() {
     ui.palette.querySelectorAll('.qp-swatch').forEach(node => {
         node.setAttribute('aria-pressed', String(node.dataset.color === state.color));
     });
+    const free = FREE_COLOUR && state.region === 'annotation';
+    ui.colour.hidden = ui.alpha.hidden = !free;
+    // Эскиз: «инвертировать разметку» — инструмент маски, на рисунке он залил бы
+    // холст цветом; место на панели нужнее своему цвету и непрозрачности.
+    ui.root.dataset.free = String(free);
+    shadow.querySelector('[data-act="invert"]').hidden = free;
+    // Свой цвет «нажат», когда выбранный цвет не из палитры.
+    ui.colour.setAttribute('aria-pressed', String(free && !PALETTE.includes(state.color)));
+    if (ui.colourInput.value !== state.color) ui.colourInput.value = state.color;
+    ui.alphaRange.value = String(Math.round(state.alpha * 100));
+    ui.alphaValue.textContent = `${Math.round(state.alpha * 100)}%`;
     ui.range.value = String(state.size);
     ui.sizeValue.textContent = `${state.size}px`;
     ui.zoom.textContent = state.width ? `${Math.round(state.view.s * 100)}%` : '';
@@ -298,8 +326,18 @@ function segment(ctx, stroke, a, b) {
 
 function replayStroke(ctx, stroke) {
     const p = stroke.points;
-    if (p.length === 2) { segment(ctx, stroke, { x: p[0], y: p[1] }, { x: p[0], y: p[1] }); return; }
+    // Мазок перерисовывается одним контуром, поэтому полупрозрачный ложится
+    // ровно, без потемнений на стыках отрезков.
+    const alpha = stroke.alpha === undefined ? 1 : stroke.alpha;
+    if (p.length === 2) {
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        segment(ctx, stroke, { x: p[0], y: p[1] }, { x: p[0], y: p[1] });
+        ctx.restore();
+        return;
+    }
     ctx.save();
+    ctx.globalAlpha = alpha;
     ctx.globalCompositeOperation = stroke.erase ? 'destination-out' : 'source-over';
     ctx.strokeStyle = stroke.color;
     ctx.lineWidth = stroke.size * 2;
@@ -345,19 +383,35 @@ function commit(command) {
     scheduleSync();
 }
 
+/* Полупрозрачный мазок. Каждое движение рисует свой отрезок, и отрезки
+   перекрываются круглыми концами: нарисованные прямо в слой с альфой, они
+   темнели бы на каждом стыке, и мазок выходил бы пятнистым. Поэтому такой
+   мазок рисуется непрозрачно на отдельном живом холсте, который на экране
+   показан с нужной непрозрачностью, а на отпускании сливается в слой одним
+   drawImage с globalAlpha. Стоимость движения — прежняя, один отрезок. */
+function strokeTarget(stroke) {
+    return stroke.alpha < 1 ? liveCtx : layerCtx;
+}
+
 function beginStroke(event, erase) {
     const p = toImage(event);
-    state.stroke = { kind: 'stroke', erase, color: paintColor(), size: state.size, points: [p.x, p.y], last: p };
-    segment(layerCtx, state.stroke, p, p);
+    const alpha = FREE_COLOUR && state.region === 'annotation' && !erase ? state.alpha : 1;
+    state.stroke = { kind: 'stroke', erase, color: paintColor(), size: state.size, alpha, points: [p.x, p.y], last: p };
+    if (alpha < 1) {
+        liveCtx.clearRect(0, 0, state.width, state.height);
+        ui.live.style.opacity = String(alpha);
+    }
+    segment(strokeTarget(state.stroke), state.stroke, p, p);
 }
 
 function extendStroke(event) {
     const stroke = state.stroke;
+    const target = strokeTarget(stroke);
     const events = typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [];
     for (const item of events.length ? events : [event]) {
         const p = toImage(item);
         if (Math.abs(p.x - stroke.last.x) < 0.5 && Math.abs(p.y - stroke.last.y) < 0.5) continue;
-        segment(layerCtx, stroke, stroke.last, p);
+        segment(target, stroke, stroke.last, p);
         stroke.points.push(p.x, p.y);
         stroke.last = p;
     }
@@ -368,12 +422,20 @@ function endStroke() {
     state.stroke = null;
     if (!stroke) return;
     delete stroke.last;
+    if (stroke.alpha < 1) {
+        layerCtx.save();
+        layerCtx.globalAlpha = stroke.alpha;
+        layerCtx.drawImage(ui.live, 0, 0);
+        layerCtx.restore();
+        liveCtx.clearRect(0, 0, state.width, state.height);
+    }
     commit(stroke);
 }
 
 function cancelStroke() {
     if (!state.stroke) return;
     state.stroke = null;
+    liveCtx.clearRect(0, 0, state.width, state.height);
     redraw();
 }
 
@@ -531,7 +593,7 @@ async function fetchBitmap(url) {
 function installImage(bitmap, base = null) {
     state.width = bitmap.width;
     state.height = bitmap.height;
-    for (const canvas of [ui.image, ui.layer]) {
+    for (const canvas of [ui.image, ui.layer, ui.live]) {
         canvas.width = state.width;
         canvas.height = state.height;
     }
@@ -712,6 +774,8 @@ listen(doc, 'paste', event => {
     if (item) { event.preventDefault(); loadFile(item.getAsFile()); }
 });
 listen(ui.range, 'input', () => setSize(Number(ui.range.value)));
+listen(ui.colourInput, 'input', () => { state.color = ui.colourInput.value; state.tool = 'brush'; refreshTools(); });
+listen(ui.alphaRange, 'input', () => { state.alpha = Number(ui.alphaRange.value) / 100; refreshTools(); });
 listen(ui.file, 'change', () => { if (ui.file.files[0]) loadFile(ui.file.files[0]); ui.file.value = ''; });
 
 const actions = {
@@ -751,6 +815,7 @@ const api = {
     flush,
     state: () => ({
         width: state.width, height: state.height, tool: state.tool, size: state.size,
+        color: state.color, alpha: state.alpha, freeColour: FREE_COLOUR,
         region: state.region, strokes: state.history.length, source: state.sourcePath,
         scale: state.view.s, uploading: Boolean(state.pendingUpload),
     }),

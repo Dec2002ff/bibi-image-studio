@@ -174,6 +174,8 @@ def build(
                     region=MASK_ANNOTATION,
                     labels=painter_labels(),
                     palette=list(SKETCH_COLOURS),
+                    # Эскизу — любой цвет и полупрозрачная кисть.
+                    free_colour=True,
                     elem_id=sketch_id,
                     elem_classes=[layout.SKETCH],
                 ),
