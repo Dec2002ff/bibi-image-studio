@@ -284,3 +284,24 @@ def test_tile_request_is_the_skeleton_alone_at_a_square():
 def test_tile_does_not_download_turbo_for_an_icon():
     request = tile.request(skeleton.render(_pose(STANDING)), turbo_ready=False)
     assert request.preset.name == tile.FALLBACK_PRESET
+
+
+def test_titles_survive_a_damaged_file(tmp_path):
+    user = tmp_path / "user"
+    (user / library.META_DIR).mkdir(parents=True)
+    (user / library.META_DIR / library.TITLES_FILE).write_text("{ broken", encoding="utf-8")
+    assert library.load_titles(user) == {}, "испорченный файл — «имён нет», а не сбой окна"
+    assert library.set_title(user, "a_01", "Name") == "Name"
+    assert library.load_titles(user) == {"a_01": "Name"}
+
+
+def test_a_redrawn_cover_wins_over_the_catalogue_tile(tmp_path):
+    catalog, user = tmp_path / "catalog", tmp_path / "user"
+    library.fetch_catalog(catalog, downloader=lambda url: (
+        _catalog_zip(["z_01"]) if url == library.ARCHIVE_URL else _tile_bytes()))
+    entry = library.list_poses(catalog, user)[0]
+    assert entry.preview() == entry.thumb
+    library.set_tile(entry, Image.new("RGB", (1024, 1024), "red"))
+    entry = library.list_poses(catalog, user)[0]
+    assert entry.preview() == user / library.META_DIR / library.COVERS_DIR / "z_01.thumb.jpg"
+    assert Image.open(entry.thumb).getpixel((5, 5))[2] > 100, "плитка каталога прежняя (бирюзовая)"

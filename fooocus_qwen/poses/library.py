@@ -17,11 +17,18 @@
 распознанные на фотографиях, данные пользователя, рядом с его генерациями.
 Скелет сохраняется сразу, плитка — когда её нарисует Qwen-Image: до этого
 в окне стоит сам скелет, и позой уже можно пользоваться.
+
+**Имена и перерисованные обложки** — тоже данные пользователя, в
+``user/outputs/poses/meta``: имена всех поз — ``titles.json``, обложки поз
+каталога — ``covers/``. Каталог — часть поставки и в репозитории, поэтому
+его файлы не переписываются: правки лежат поверх него. Свои позы
+перерисовывают собственную обложку.
 """
 
 from __future__ import annotations
 
 import io
+import json
 import logging
 import time
 import urllib.request
@@ -44,6 +51,10 @@ TILE_URL = STORAGE + "/poses/" + MODEL + "/jpg/{name}.jpg"
 
 THUMB_SIDE = 320
 CUSTOM_PREFIX = "custom_"
+META_DIR = "meta"
+TITLES_FILE = "titles.json"
+COVERS_DIR = "covers"
+MAX_TITLE = 60
 
 
 @dataclass(frozen=True)
@@ -51,6 +62,11 @@ class PoseEntry:
     name: str
     folder: Path
     custom: bool
+    # Имя, заданное человеком (``titles.json``), или пустое — тогда в окне
+    # стоит имя по умолчанию (см. ui/reference_tools.display_title).
+    title: str = ""
+    # Каталог перерисованных обложек поз каталога; у своих поз — None.
+    covers: Path | None = None
 
     @property
     def keypoints(self) -> Path:
@@ -68,9 +84,23 @@ class PoseEntry:
     def thumb(self) -> Path:
         return self.folder / f"{self.name}.thumb.jpg"
 
+    @property
+    def cover_tile(self) -> Path:
+        """Куда ложится перерисованная обложка: своя поза — на место своей
+        плитки, поза каталога — в ``meta/covers`` поверх каталога."""
+        return self.covers / f"{self.name}.jpg" if self.covers else self.tile
+
+    @property
+    def cover_thumb(self) -> Path:
+        return self.covers / f"{self.name}.thumb.jpg" if self.covers else self.thumb
+
     def preview(self) -> Path:
-        """Что показать в окне выбора: плитку, а пока её нет — скелет."""
-        return self.thumb if self.thumb.exists() else self.skeleton
+        """Что показать в окне выбора: перерисованную обложку, плитку, а пока
+        их нет — скелет."""
+        for path in (self.cover_thumb, self.thumb):
+            if path.exists():
+                return path
+        return self.skeleton
 
 
 def _entries(folder: Path, custom: bool) -> list[PoseEntry]:
@@ -82,8 +112,47 @@ def _entries(folder: Path, custom: bool) -> list[PoseEntry]:
 
 
 def list_poses(catalog: Path, user: Path) -> list[PoseEntry]:
-    """Каталог по имени, затем свои позы в порядке добавления."""
-    return _entries(catalog, custom=False) + _entries(user, custom=True)
+    """Каталог по имени, затем свои позы в порядке добавления — с именами и обложками."""
+    titles = load_titles(user)
+    covers = user / META_DIR / COVERS_DIR
+    entries = [
+        PoseEntry(entry.name, entry.folder, False, titles.get(entry.name, ""), covers)
+        for entry in _entries(catalog, custom=False)
+    ]
+    entries += [
+        PoseEntry(entry.name, entry.folder, True, titles.get(entry.name, ""))
+        for entry in _entries(user, custom=True)
+    ]
+    return entries
+
+
+def _titles_file(user: Path) -> Path:
+    return user / META_DIR / TITLES_FILE
+
+
+def load_titles(user: Path) -> dict[str, str]:
+    """Имена поз, заданные человеком. Испорченный файл — «имён нет», а не сбой окна."""
+    try:
+        data = json.loads(_titles_file(user).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {str(key): str(value) for key, value in data.items()} if isinstance(data, dict) else {}
+
+
+def set_title(user: Path, name: str, title: str) -> str:
+    """Задаёт имя позе; пустое — вернуть имя по умолчанию. Возвращает записанное."""
+    clean = " ".join(title.split())[:MAX_TITLE]
+    titles = load_titles(user)
+    if clean:
+        titles[name] = clean
+    else:
+        titles.pop(name, None)
+    path = _titles_file(user)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    partial = path.with_suffix(".part")
+    partial.write_text(json.dumps(titles, ensure_ascii=False, indent=1), encoding="utf-8")
+    partial.replace(path)
+    return clean
 
 
 def save_thumb(tile: Image.Image, destination: Path) -> None:
@@ -139,8 +208,8 @@ def fetch_catalog(
     return len(entries)
 
 
-def add_custom(user: Path, pose: skeleton.Pose) -> PoseEntry:
-    """Сохраняет распознанную позу; плитки у неё пока нет."""
+def add_custom(user: Path, pose: skeleton.Pose, title: str = "") -> PoseEntry:
+    """Сохраняет распознанную позу (и имя, если задано); плитки у неё пока нет."""
     user.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%d_%H%M%S")
     name, suffix = f"{CUSTOM_PREFIX}{stamp}", 1
@@ -150,9 +219,14 @@ def add_custom(user: Path, pose: skeleton.Pose) -> PoseEntry:
     entry = PoseEntry(name, user, custom=True)
     skeleton.render(pose).save(entry.skeleton)
     entry.keypoints.write_text(pose.to_json(), encoding="utf-8")
+    if title.strip():
+        return PoseEntry(name, user, True, set_title(user, name, title))
     return entry
 
 
 def set_tile(entry: PoseEntry, tile: Image.Image) -> None:
-    tile.convert("RGB").save(entry.tile, quality=92)
-    save_thumb(tile, entry.thumb)
+    """Обложка позы: своя — на место плитки, каталога — поверх каталога."""
+    target, thumb = entry.cover_tile, entry.cover_thumb
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tile.convert("RGB").save(target, quality=92)
+    save_thumb(tile, thumb)

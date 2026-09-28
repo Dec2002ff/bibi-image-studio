@@ -68,6 +68,9 @@ MODAL_MESSAGE = "qs-modalmessage"
 # Окно поз: сетка плиток и поле фото для «Добавить позу».
 POSE_GRID = "qs-posegrid"
 POSE_PHOTO = "qs-posephoto"
+# Карандаш на плитке (ставит скрипт) и обложка в панели правки позы.
+POSE_EDIT = "qs-poseedit"
+POSE_COVER = "qs-posecover"
 # Окно эскиза: карточка шире обычной и холст кисти в ней.
 SKETCH_BOX = "qs-sketchbox"
 SKETCH = "qs-sketch"

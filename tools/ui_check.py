@@ -1118,6 +1118,98 @@ def scenario_sketch_colour(browser, url, report: Report, fake: FakeGenerator, sa
     page.close()
 
 
+def visible_input(page, label: str):
+    for item in page.get_by_label(label, exact=True).all():
+        if item.is_visible():
+            return item
+    raise LookupError(f"no visible field {label!r}")
+
+
+def pose_grid_text(page) -> str:
+    return page.evaluate(
+        f"() => (({VISIBLE_MODAL_JS})()?.querySelector('.qs-posegrid')?.innerText || '')"
+    )
+
+
+def scenario_pose_edit(browser, url, report: Report, fake: FakeGenerator, samples: Path) -> None:
+    """Имена поз и карандаш на плитках: правка имени и перерисовка обложки."""
+    from fooocus_qwen.poses import library, tile
+
+    print("pose names and the edit pencil:")
+    page, errors = fresh_page(browser, url)
+    page.locator(".qs-refpose:visible").nth(0).click()
+    wait_modal(page, True)
+    total = len(library.list_poses(config.POSE_LIBRARY_DIR, config.user_pose_dir()))
+    wait_pose_tiles(page, total + 1)
+    page.wait_for_function(
+        f"() => ({VISIBLE_MODAL_JS})().querySelectorAll('.qs-poseedit').length === {total}", timeout=10000,
+    )
+    last_has_pen = page.evaluate(f"""() => {{
+        const items = [...({VISIBLE_MODAL_JS})().querySelectorAll('.qs-posegrid .thumbnail-item')];
+        return !!items[items.length - 1].querySelector('.qs-poseedit');
+    }}""")
+    report.check(not last_has_pen, f"a pencil on each of {total} poses, none on “Add a pose”")
+    text = pose_grid_text(page)
+    report.check("Dance 1" in text and "Standing 1" in text, "tiles are captioned with default names")
+    shot = samples.parent / "pose-edit.png"
+    page.screenshot(path=str(shot))
+    print(f"  screenshot: {shot}")
+
+    # Карандаш: правка, ячейки не трогаются.
+    page.locator(".qs-posegrid:visible .qs-poseedit").nth(1).click()
+    page.wait_for_function(
+        f"() => (({VISIBLE_MODAL_JS})()?.innerText || '').includes('Pose “Dance 2”')", timeout=10000,
+    )
+    page.screenshot(path=str(samples.parent / "pose-edit-panel.png"))
+    name = visible_input(page, "Pose name")
+    report.check(name.input_value() == "Dance 2" and not reference_slots(page)[0]["loaded"],
+                 f"the pencil opens the edit panel, name {name.input_value()!r}, cells untouched")
+    name.fill("Hands up")
+    click_text(page, "Save name")
+    page.wait_for_function(
+        f"() => (({VISIBLE_MODAL_JS})()?.innerText || '').includes('Name saved')", timeout=10000,
+    )
+    report.check("Hands up" in pose_grid_text(page), "the new name is under the tile")
+    titles = library.load_titles(config.user_pose_dir())
+    report.check(titles.get("dance_02") == "Hands up", f"stored with the user's data: {titles}")
+
+    before = len(fake.requests)
+    click_text(page, "Redraw cover")
+    request = fake.wait(before + 1)
+    page.wait_for_function(
+        f"() => (({VISIBLE_MODAL_JS})()?.innerText || '').includes('Cover redrawn')", timeout=20000,
+    )
+    cover = config.user_pose_dir() / library.META_DIR / library.COVERS_DIR / "dance_02.thumb.jpg"
+    report.check(request.prompt == tile.PROMPT and cover.exists(),
+                 "“Redraw cover” asks the model and stores the cover over the catalogue")
+
+    click_text(page, "Back to poses")
+    page.wait_for_timeout(400)
+    page.locator(".qs-posegrid:visible img").nth(1).click()
+    wait_loaded(page, [0])
+    wait_modal(page, False)
+    report.check(True, "after editing, a plain click on the same tile still picks it")
+
+    # Новая поза с именем.
+    page.locator(".qs-refpose:visible").nth(2).click()
+    wait_modal(page, True)
+    wait_pose_tiles(page, total + 1)
+    page.locator(".qs-posegrid:visible img").last.click()
+    page.wait_for_selector(".qs-posephoto:visible input[type=file]", state="attached", timeout=20000)
+    visible_input(page, "Pose name").fill("Victory")
+    photo = samples / "pose_named.jpg"
+    shutil.copy(config.POSE_LIBRARY_DIR / "tpose_01.jpg", photo)
+    page.locator(".qs-posephoto:visible input[type=file]").set_input_files(str(photo))
+    wait_loaded(page, [0, 2], timeout=60000)
+    page.wait_for_function(
+        f"() => (({VISIBLE_MODAL_JS})()?.querySelector('.qs-posegrid')?.innerText || '').includes('Victory')",
+        timeout=60000,
+    )
+    report.check(True, "a pose added with a name shows it under its tile")
+    report.check(not errors, "no page errors" + (f": {errors[:2]}" if errors else ""))
+    page.close()
+
+
 def scenario_performance(browser, url, report: Report, fake: FakeGenerator) -> None:
     """Секция «Производительность»: состояние, точность, SageAttention на лету."""
     print("performance:")
@@ -1185,7 +1277,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Browser check of the interface")
     parser.add_argument("--port", type=int, default=7899)
     parser.add_argument("--only", nargs="*", default=None,
-                        help="layout language painter annotation outpaint latency paste gallery send references tools viewer sketch performance secret")
+                        help="layout language painter annotation outpaint latency paste gallery send references tools viewer sketch poses performance secret")
     args = parser.parse_args()
 
     from playwright.sync_api import sync_playwright
@@ -1235,6 +1327,7 @@ def main() -> int:
         "tools": lambda b, r: scenario_tools(b, url, r, fake, samples),
         "viewer": lambda b, r: scenario_viewer(b, url, r, fake, samples),
         "sketch": lambda b, r: scenario_sketch_colour(b, url, r, fake, samples),
+        "poses": lambda b, r: scenario_pose_edit(b, url, r, fake, samples),
         "performance": lambda b, r: scenario_performance(b, url, r, fake),
         "secret": lambda b, r: scenario_secret(b, url, r),
     }

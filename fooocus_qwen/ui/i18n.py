@@ -94,6 +94,20 @@ T: dict[str, tuple[str, str]] = {
     # Окна инструментов ячейки (ui/reference_tools.py).
     "pose_add": ("Добавить позу", "Add a pose"),
     "pose_photo": ("Фото с нужной позой", "A photo with the pose"),
+    "pose_name": ("Имя позы", "Pose name"),
+    "pose_name_hint": ("необязательно — можно задать и потом", "optional — you can set it later too"),
+    "pose_save_name": ("Сохранить имя", "Save name"),
+    "pose_redraw": ("Перерисовать обложку", "Redraw cover"),
+    "pose_back": ("К позам", "Back to poses"),
+    "pose_edit_tip": ("Изменить имя или обложку", "Edit name or cover"),
+    # Имена поз каталога по умолчанию: категория из имени файла и номер.
+    "pose_cat_dance": ("Танец", "Dance"),
+    "pose_cat_flexing": ("Сила", "Flexing"),
+    "pose_cat_jumping": ("Прыжок", "Jump"),
+    "pose_cat_laying": ("Лёжа", "Lying"),
+    "pose_cat_sitting": ("Сидя", "Sitting"),
+    "pose_cat_standing": ("Стоя", "Standing"),
+    "pose_cat_tpose": ("T-поза", "T-pose"),
     "modal_close": ("Закрыть", "Close"),
     "modal_cancel": ("Отмена", "Cancel"),
     "modal_accept": ("Принять", "Accept"),
@@ -333,6 +347,11 @@ MESSAGES: dict[str, tuple[str, str]] = {
         "description for you.",
     ),
     "edit_interrupted": ("Правка прервана", "Edit interrupted"),
+    "pose_default_title": ("Моя поза {number}", "My pose {number}"),
+    "pose_edit_title": ("**Поза «{title}»**", "**Pose “{title}”**"),
+    "pose_name_saved": ("Имя сохранено: «{title}»", "Name saved: “{title}”"),
+    "pose_name_reset": ("Имя сброшено — стоит имя по умолчанию", "Name cleared — the default name is back"),
+    "pose_cover_done": ("Обложка перерисована", "Cover redrawn"),
     "pose_title": ("**Поза для ячейки {cell}**", "**Pose for cell {cell}**"),
     "pose_add_hint": (
         "Выберите фото человека в нужной позе: поза будет распознана и положена в ячейку, "

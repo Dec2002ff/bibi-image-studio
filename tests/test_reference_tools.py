@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import types
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -91,8 +92,9 @@ def test_each_pose_button_opens_the_window_for_its_own_cell(poses):
     _studio, _components, found = _handlers()
     openers = [fn.fn for fn in found["open_pose_window"]]
     assert len(openers) == N
-    target, window, add_panel, title, _message = openers[6]("ru")
+    target, window, add_panel, title, _message, edit_panel = openers[6]("ru")
     assert target == 6 and _visible(window) is True and _visible(add_panel) is False
+    assert _visible(edit_panel) is False
     assert "7" in title
 
 
@@ -102,13 +104,14 @@ def test_the_window_lists_the_catalogue_then_add_pose(poses):
     assert names == ["dance_01", "standing_01"]
     assert len(tiles) == 3 and tiles[-1] == (str(reference_tools.ADD_POSE_TILE), "Добавить позу")
     assert tiles[0][0].endswith("dance_01.thumb.jpg") and message == ""
+    assert [caption for _, caption in tiles[:2]] == ["Танец 1", "Стоя 1"], "имя по умолчанию — категория и номер"
 
 
 def test_picking_a_pose_puts_its_skeleton_into_the_target_cell(poses):
     _studio, _components, found = _handlers()
     pick = found["pick_pose"][0].fn
-    outputs = pick(3, ["dance_01", "standing_01"], [], None, "ru", _event(1))
-    grid, slots, tags, status, (window, add_panel, message) = _split(outputs)
+    outputs = pick("pick", 3, ["dance_01", "standing_01"], [], None, "ru", _event(1))
+    grid, slots, tags, status, (window, add_panel, message, *_edit) = _split(outputs)
     assert grid[3] is not None and all(image is None for i, image in enumerate(grid) if i != 3)
     assert np.asarray(grid[3]).mean() < 40, "в ячейке — скелет на чёрном"
     assert slots[3]["value"] is grid[3] and all("value" not in slot for i, slot in enumerate(slots) if i != 3)
@@ -117,8 +120,8 @@ def test_picking_a_pose_puts_its_skeleton_into_the_target_cell(poses):
 
 def test_the_last_tile_opens_the_photo_field_and_keeps_the_grid(poses):
     _studio, _components, found = _handlers()
-    outputs = found["pick_pose"][0].fn(0, ["dance_01", "standing_01"], [], None, "ru", _event(2))
-    grid, slots, _tags, _status, (window, add_panel, message) = _split(outputs)
+    outputs = found["pick_pose"][0].fn("pick", 0, ["dance_01", "standing_01"], [], None, "ru", _event(2))
+    grid, slots, _tags, _status, (window, add_panel, message, *_edit) = _split(outputs)
     assert _untouched(grid) and all(_untouched(slot) for slot in slots), "ячейки не тронуты"
     assert _untouched(window), "окно остаётся открытым"
     assert _visible(add_panel) is True and "фото" in message.lower()
@@ -132,13 +135,14 @@ def test_add_pose_saves_it_places_the_skeleton_and_orders_a_tile(poses, monkeypa
     monkeypatch.setattr(detect, "to_pose", lambda found: _pose())
     _studio, _components, found = _handlers(studio)
 
-    outputs = found["add_pose"][0].fn(Image.new("RGB", (300, 400)), 5, [], None, "ru")
+    outputs = found["add_pose"][0].fn(Image.new("RGB", (300, 400)), "", 5, [], None, "ru")
     grid = outputs[0]
     names, tiles, add_panel, message, new_pose = outputs[1 + 2 * N + 1:]
     assert grid[5] is not None
     assert len(names) == 3 and names[-1] == new_pose and new_pose.startswith(library.CUSTOM_PREFIX)
     assert tiles[-2][0].endswith(f"{new_pose}.png"), "пока плитки нет — в окне скелет"
     assert (user / f"{new_pose}.json").exists() and _visible(add_panel) is False
+    assert tiles[-2][1] == "Моя поза 1", "без имени — «Моя поза N»"
 
     asked = []
 
@@ -148,7 +152,7 @@ def test_add_pose_saves_it_places_the_skeleton_and_orders_a_tile(poses, monkeypa
 
     monkeypatch.setattr(studio, "run_generation", run_generation)
     monkeypatch.setattr(studio, "turbo_weights_present", lambda: False)
-    names, tiles, message = found["draw_tile"][0].fn(new_pose, "ru", progress=lambda *a, **k: None)
+    names, tiles, message, _cover = found["draw_tile"][0].fn(new_pose, "ru", progress=lambda *a, **k: None)
     assert len(asked) == 1 and len(asked[0].references) == 1
     assert tiles[-2][0].endswith(f"{new_pose}.thumb.jpg") and "готова" in message
 
@@ -161,7 +165,7 @@ def test_no_person_on_the_photo_is_said_in_the_window(poses, monkeypatch):
 
     monkeypatch.setattr(studio, "pose_detector", lambda: types.SimpleNamespace(detect=refuse))
     _studio, _components, found = _handlers(studio)
-    outputs = found["add_pose"][0].fn(Image.new("RGB", (300, 400)), 0, [], None, "ru")
+    outputs = found["add_pose"][0].fn(Image.new("RGB", (300, 400)), "", 0, [], None, "ru")
     assert "не найден человек" in outputs[-2] and outputs[-1] is None
     assert not list(config.user_pose_dir().glob("*.json")), "нераспознанная поза не сохраняется"
 
@@ -191,3 +195,60 @@ def test_sketch_without_a_canvas_keeps_the_window(poses):
     outputs = found["accept_sketch"][0].fn("", 0, [], None, "ru")
     assert _untouched(outputs[-2]), "окно эскиза остаётся открытым"
     assert "пуст" in outputs[-1]
+
+
+# --- имена поз и правка карандашом ---
+
+
+def _recognising_studio(monkeypatch):
+    studio = Studio(config.AppConfig())
+    monkeypatch.setattr(studio, "pose_detector", lambda: types.SimpleNamespace(detect=lambda image: "найдено"))
+    monkeypatch.setattr(detect, "to_pose", lambda found: _pose())
+    return studio
+
+
+def test_a_name_given_when_adding_is_kept(poses, monkeypatch):
+    _studio, _components, found = _handlers(_recognising_studio(monkeypatch))
+    outputs = found["add_pose"][0].fn(Image.new("RGB", (300, 400)), "  Руки   вверх ", 0, [], None, "ru")
+    tiles = outputs[1 + 2 * N + 2]
+    assert tiles[-2][1] == "Руки вверх", "пробелы по краям и двойные — убраны"
+
+
+def test_the_pencil_opens_the_edit_panel_and_leaves_the_cells(poses):
+    _studio, _components, found = _handlers()
+    outputs = found["pick_pose"][0].fn("edit", 3, ["dance_01", "standing_01"], [], None, "ru", _event(1))
+    grid, slots, _tags, _status, rest = _split(outputs)
+    window, add_panel, message, edit_panel, heading, cover, name, editing, gallery = rest
+    assert _untouched(grid) and all(_untouched(slot) for slot in slots), "правка не кладёт позу в ячейку"
+    assert _untouched(window) and _visible(edit_panel) is True
+    assert editing == "standing_01" and name == "Стоя 1" and "Стоя 1" in heading
+    assert cover.endswith("standing_01.thumb.jpg")
+    assert gallery.selected_index is None, "выбор сброшен — плитку можно нажать снова"
+
+
+def test_renaming_a_catalogue_pose_keeps_the_catalogue_files(poses):
+    catalog, user = poses
+    before = sorted(path.name for path in catalog.iterdir())
+    _studio, _components, found = _handlers()
+    save = found["save_pose_name"][0].fn
+    names, tiles, heading, message = save("standing_01", "Руки в боки", "ru")
+    assert tiles[1][1] == "Руки в боки" and "Руки в боки" in heading and "сохранено" in message.lower()
+    assert sorted(path.name for path in catalog.iterdir()) == before, "каталог — поставка, его файлы не трогаются"
+    assert library.load_titles(user) == {"standing_01": "Руки в боки"}
+
+    names, tiles, heading, message = save("standing_01", "   ", "ru")
+    assert tiles[1][1] == "Стоя 1" and "сброшено" in message.lower(), "пустое имя — снова по умолчанию"
+
+
+def test_redrawing_a_catalogue_cover_goes_over_the_catalogue(poses, monkeypatch):
+    catalog, user = poses
+    studio = Studio(config.AppConfig())
+    monkeypatch.setattr(studio, "run_generation", lambda request, lang, progress=None: (
+        [types.SimpleNamespace(image=Image.new("RGB", (1024, 1024), "orange"))], None))
+    monkeypatch.setattr(studio, "turbo_weights_present", lambda: False)
+    _studio, _components, found = _handlers(studio)
+    original = (catalog / "dance_01.thumb.jpg").read_bytes()
+    names, tiles, message, cover = found["redraw_cover"][0].fn("dance_01", "ru", progress=lambda *a, **k: None)
+    assert (catalog / "dance_01.thumb.jpg").read_bytes() == original, "обложка каталога не переписана"
+    assert cover.endswith(str(Path("meta", "covers", "dance_01.thumb.jpg")))
+    assert tiles[0][0] == cover and "перерисована" in message

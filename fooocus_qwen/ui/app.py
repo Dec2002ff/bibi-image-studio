@@ -207,6 +207,8 @@ def build(cfg: config.AppConfig, return_studio: bool = False):
         demo.load(None, None, None, js=reference_tools.TITLES_JS)
         # Просмотр в полном размере: клик по результату и по референсу.
         demo.load(None, None, None, js=viewer.script())
+        # Карандаш на плитках поз: правка имени и обложки.
+        demo.load(None, None, None, js=reference_tools.POSE_EDIT_JS)
 
         # Регистрация именно здесь, после сборки вкладок: до неё
         # ``localizer.components`` ещё пуст, и клик обновлял бы одну кнопку.

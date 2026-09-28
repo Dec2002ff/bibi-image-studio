@@ -297,7 +297,13 @@ recognised on the CPU in a fraction of a second with
 are downloaded by the installer), the skeleton goes into the cell at once, and
 the pose is saved to `user/outputs/poses/`, next to your generations. Qwen-Image then draws a tile for it in the
 catalogue's style (about 13 s with Turbo if its adapter is already downloaded,
-LowQuality otherwise).
+LowQuality otherwise). Give the pose a name in the field above the photo, or
+it becomes "My pose N".
+
+Each tile shows the pose's name. The pencil in a tile's corner opens its
+editor: rename it or redraw its cover with Qwen-Image. Edits to catalogue
+poses are stored with your data (`user/outputs/poses/meta/`), on top of the
+catalogue, which itself stays unchanged.
 
 **Sketches.** The pencil icon opens a white canvas with the same brush as the Edit tab:
 palette plus a custom colour picker, brush opacity, size, eraser, undo/redo,
