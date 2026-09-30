@@ -305,3 +305,42 @@ def test_a_redrawn_cover_wins_over_the_catalogue_tile(tmp_path):
     entry = library.list_poses(catalog, user)[0]
     assert entry.preview() == user / library.META_DIR / library.COVERS_DIR / "z_01.thumb.jpg"
     assert Image.open(entry.thumb).getpixel((5, 5))[2] > 100, "плитка каталога прежняя (бирюзовая)"
+
+
+def test_the_cover_prompt_says_the_pose_in_words_and_asks_for_candidates():
+    """Непривычную позу модель по скелету не держит — промт говорит её словами."""
+    pose = _pose(STANDING)
+    request = tile.request(skeleton.render(pose), turbo_ready=True, pose=pose)
+    assert request.prompt.startswith(tile.PROMPT) and "Her body is upright" in request.prompt
+    assert request.image_number == tile.CANDIDATES >= 2
+    assert tile.request(skeleton.render(pose), turbo_ready=True).prompt == tile.PROMPT, "без позы — как было"
+
+
+def test_the_closest_candidate_wins_and_a_figureless_one_loses():
+    """Выбор обложки: ближайшая по позе, картинка без человека — в конец."""
+    target = _pose(STANDING)
+    shifted = {index: (x + 60, y) if index in (skeleton.R_WRIST, skeleton.L_WRIST) else (x, y)
+               for index, (x, y) in STANDING.items()}
+    exact, off, empty = (Image.new("RGB", (8, 8), colour) for colour in ("red", "green", "blue"))
+
+    class Detector:
+        def detect(self, image):
+            if image is empty:
+                raise detect.NoPersonFound("nobody")
+            return image
+
+    poses = {id(exact): target, id(off): _pose(shifted)}
+    real = detect.to_pose
+    try:
+        detect.to_pose = lambda found: poses[id(found)]
+        assert tile.best([off, empty, exact], target, Detector()) is exact
+        assert tile.best([empty, off], target, Detector()) is off
+    finally:
+        detect.to_pose = real
+
+
+def test_pose_error_is_zero_for_the_same_pose_and_grows_with_distance():
+    pose = _pose(STANDING)
+    assert tile.pose_error(pose, pose)[0] == 0
+    moved = _pose({i: (x + (40 if i == skeleton.L_WRIST else 0), y) for i, (x, y) in STANDING.items()})
+    assert tile.pose_error(pose, moved)[0] > 0

@@ -30,14 +30,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-import numpy as np  # noqa: E402
 from PIL import Image  # noqa: E402
 
 from fooocus_qwen import config  # noqa: E402
 from fooocus_qwen.engine import presets  # noqa: E402
 from fooocus_qwen.engine.generator import GenerationRequest  # noqa: E402
 from fooocus_qwen.logging_setup import use_utf8_console  # noqa: E402
-from fooocus_qwen.poses import detect, skeleton  # noqa: E402
+from fooocus_qwen.poses import detect, skeleton, tile  # noqa: E402
 
 WORK = ROOT / "tmp" / "pose_tile"
 TILES = ROOT / "tmp" / "openposes"
@@ -76,32 +75,8 @@ VARIANTS = {
     "painterly-anon": (PAINTERLY_ANON, False),
 }
 
-# Перестановка левых и правых точек BODY_18.
-_MIRROR = {2: 5, 3: 6, 4: 7, 8: 11, 9: 12, 10: 13, 14: 15, 16: 17}
-_MIRROR.update({v: k for k, v in _MIRROR.items()})
-
-
-def normalized(points: np.ndarray, visible: np.ndarray) -> np.ndarray:
-    seen = points[visible]
-    low, high = seen.min(0), seen.max(0)
-    return (points - (low + high) / 2) / max(float((high - low).max()), 1.0)
-
-
-def pose_error(target: skeleton.Pose, result: skeleton.Pose) -> tuple[float, float]:
-    a = np.array([p[:2] for p in target.points])
-    b = np.array([p[:2] for p in result.points])
-    va = np.array([p[2] > 0 for p in target.points])
-    vb = np.array([p[2] > 0 for p in result.points])
-    both = va & vb
-    if both.sum() < 4:
-        return float("nan"), float("nan")
-    na, nb = normalized(a, va), normalized(b, vb)
-    direct = float(np.linalg.norm(na[both] - nb[both], axis=1).mean() * 100)
-    order = [_MIRROR.get(i, i) for i in range(skeleton.POINTS)]
-    nm, vm = nb[order], vb[order]
-    both_m = va & vm
-    mirrored = float(np.linalg.norm(na[both_m] - nm[both_m], axis=1).mean() * 100)
-    return direct, mirrored
+# Мера — та же, что у приложения при выборе обложки.
+pose_error = tile.pose_error
 
 
 def main() -> int:

@@ -34,7 +34,7 @@ from PIL import Image
 
 from .. import config
 from ..engine.generator import MASK_ANNOTATION
-from ..poses import detect, library, tile
+from ..poses import detect, library, skeleton, tile
 from . import layout, painter
 from .i18n import Localizer, T, painter_labels, pick, say
 from .painter import payload
@@ -450,15 +450,27 @@ def build(
         progress(0, desc=say("pose_tile_drawing", lang))
         with Image.open(entry.skeleton) as opened:
             bones = opened.convert("RGB")
-        request = tile.request(bones, turbo_ready=studio.turbo_weights_present())
+        try:
+            pose = skeleton.load(entry.keypoints)
+        except (OSError, ValueError):
+            pose = None
+        # Поза словами в промте и несколько кандидатов (см. poses/tile.py).
+        request = tile.request(bones, turbo_ready=studio.turbo_weights_present(), pose=pose)
 
-        def report(_index: int, step: int, total: int) -> None:
-            progress((step, total), desc=say("pose_tile_drawing", lang))
+        def report(index: int, step: int, total: int) -> None:
+            # Кандидаты рисуются подряд: общая полоса на все, а не по кругу на каждого.
+            progress((index * total + step, total * request.image_number), desc=say("pose_tile_drawing", lang))
 
         produced, failure = studio.run_generation(request, lang, progress=report)
         if failure is not None or not produced:
             return gr.update(), gr.update(), say("pose_tile_failed", lang, error=failure or "—"), gr.update()
-        library.set_tile(entry, produced[0].image)
+        chosen = produced[0].image
+        if pose is not None and len(produced) > 1:
+            try:
+                chosen = tile.best([item.image for item in produced], pose, studio.pose_detector())
+            except Exception:  # noqa: BLE001 — без распознавания остаётся первый кандидат
+                LOGGER.exception("Could not score the cover candidates; keeping the first one")
+        library.set_tile(entry, chosen)
         entries = library.list_poses(config.POSE_LIBRARY_DIR, config.user_pose_dir())
         fresh = _entry(entry.name)
         return (

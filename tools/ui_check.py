@@ -857,7 +857,8 @@ def scenario_tools(browser, url, report: Report, fake: FakeGenerator, samples: P
     page.locator(".qs-posephoto:visible input[type=file]").set_input_files(str(photo))
     wait_loaded(page, [0, 2], timeout=60000)
     request = fake.wait(before + 1, timeout=60)
-    report.check(request.prompt == tile.PROMPT and len(request.references) == 1,
+    report.check(request.prompt.startswith(tile.PROMPT) and "Her " in request.prompt[len(tile.PROMPT):]
+                 and len(request.references) == 1 and request.image_number == tile.CANDIDATES,
                  f"new pose tile requested from the model: skeleton reference {request.references[0].size}")
     page.wait_for_function(
         f"() => (({VISIBLE_MODAL_JS})()?.innerText || '').includes('Tile ready')", timeout=60000,
@@ -1180,7 +1181,7 @@ def scenario_pose_edit(browser, url, report: Report, fake: FakeGenerator, sample
         f"() => (({VISIBLE_MODAL_JS})()?.innerText || '').includes('Cover redrawn')", timeout=20000,
     )
     cover = config.user_pose_dir() / library.META_DIR / library.COVERS_DIR / "dance_02.thumb.jpg"
-    report.check(request.prompt == tile.PROMPT and cover.exists(),
+    report.check(request.prompt.startswith(tile.PROMPT) and cover.exists(),
                  "“Redraw cover” asks the model and stores the cover over the catalogue")
 
     click_text(page, "Back to poses")
