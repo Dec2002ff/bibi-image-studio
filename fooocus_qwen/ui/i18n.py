@@ -99,6 +99,11 @@ T: dict[str, tuple[str, str]] = {
     "pose_save_name": ("Сохранить имя", "Save name"),
     "pose_redraw": ("Перерисовать обложку", "Redraw cover"),
     "pose_back": ("К позам", "Back to poses"),
+    "pose_schematic": ("Схематичный вид", "Schematic view"),
+    "pose_schematic_info": (
+        "показывать вместо обложки скелет позы — если обложка не удалась",
+        "show the pose skeleton instead of the cover — when the cover came out wrong",
+    ),
     "pose_edit_tip": ("Изменить имя или обложку", "Edit name or cover"),
     # Имена поз каталога по умолчанию: категория из имени файла и номер.
     "pose_cat_dance": ("Танец", "Dance"),
@@ -352,6 +357,11 @@ MESSAGES: dict[str, tuple[str, str]] = {
     "pose_name_saved": ("Имя сохранено: «{title}»", "Name saved: “{title}”"),
     "pose_name_reset": ("Имя сброшено — стоит имя по умолчанию", "Name cleared — the default name is back"),
     "pose_cover_done": ("Обложка перерисована", "Cover redrawn"),
+    "pose_schematic_on": (
+        "Вместо обложки — схема позы; обложка сохранена, снимите флажок, чтобы вернуть её",
+        "The pose is shown as a skeleton; the cover is kept — untick to bring it back",
+    ),
+    "pose_schematic_off": ("Обложка снова на месте", "The cover is back"),
     "pose_title": ("**Поза для ячейки {cell}**", "**Pose for cell {cell}**"),
     "pose_add_hint": (
         "Выберите фото человека в нужной позе: поза будет распознана и положена в ячейку, "

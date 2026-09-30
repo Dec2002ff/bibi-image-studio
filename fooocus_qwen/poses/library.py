@@ -20,9 +20,14 @@
 
 **Имена и перерисованные обложки** — тоже данные пользователя, в
 ``user/outputs/poses/meta``: имена всех поз — ``titles.json``, обложки поз
-каталога — ``covers/``. Каталог — часть поставки и в репозитории, поэтому
-его файлы не переписываются: правки лежат поверх него. Свои позы
-перерисовывают собственную обложку.
+каталога — ``covers/``, позы в схематичном виде — ``schematic.json``.
+Каталог — часть поставки и в репозитории, поэтому его файлы не
+переписываются: правки лежат поверх него. Свои позы перерисовывают
+собственную обложку.
+
+**Схематичный вид** — когда обложка не удалась (модель не держит позу), её
+можно не показывать: вместо неё в окне стоит сам скелет. Обложка при этом
+не удаляется — флажок снят, и она снова на месте.
 """
 
 from __future__ import annotations
@@ -53,6 +58,7 @@ THUMB_SIDE = 320
 CUSTOM_PREFIX = "custom_"
 META_DIR = "meta"
 TITLES_FILE = "titles.json"
+SCHEMATIC_FILE = "schematic.json"
 COVERS_DIR = "covers"
 MAX_TITLE = 60
 
@@ -67,6 +73,8 @@ class PoseEntry:
     title: str = ""
     # Каталог перерисованных обложек поз каталога; у своих поз — None.
     covers: Path | None = None
+    # Показывать скелет вместо обложки (``schematic.json``).
+    schematic: bool = False
 
     @property
     def keypoints(self) -> Path:
@@ -95,8 +103,10 @@ class PoseEntry:
         return self.covers / f"{self.name}.thumb.jpg" if self.covers else self.thumb
 
     def preview(self) -> Path:
-        """Что показать в окне выбора: перерисованную обложку, плитку, а пока
-        их нет — скелет."""
+        """Что показать в окне выбора: скелет в схематичном виде, иначе
+        перерисованную обложку, плитку, а пока их нет — скелет."""
+        if self.schematic:
+            return self.skeleton
         for path in (self.cover_thumb, self.thumb):
             if path.exists():
                 return path
@@ -114,13 +124,14 @@ def _entries(folder: Path, custom: bool) -> list[PoseEntry]:
 def list_poses(catalog: Path, user: Path) -> list[PoseEntry]:
     """Каталог по имени, затем свои позы в порядке добавления — с именами и обложками."""
     titles = load_titles(user)
+    schematic = load_schematic(user)
     covers = user / META_DIR / COVERS_DIR
     entries = [
-        PoseEntry(entry.name, entry.folder, False, titles.get(entry.name, ""), covers)
+        PoseEntry(entry.name, entry.folder, False, titles.get(entry.name, ""), covers, entry.name in schematic)
         for entry in _entries(catalog, custom=False)
     ]
     entries += [
-        PoseEntry(entry.name, entry.folder, True, titles.get(entry.name, ""))
+        PoseEntry(entry.name, entry.folder, True, titles.get(entry.name, ""), None, entry.name in schematic)
         for entry in _entries(user, custom=True)
     ]
     return entries
@@ -147,12 +158,38 @@ def set_title(user: Path, name: str, title: str) -> str:
         titles[name] = clean
     else:
         titles.pop(name, None)
-    path = _titles_file(user)
+    _write_json(_titles_file(user), titles)
+    return clean
+
+
+def _write_json(path: Path, data) -> None:
+    """Запись файла правок целиком: через ``.part``, чтобы сбой не оставил половину."""
     path.parent.mkdir(parents=True, exist_ok=True)
     partial = path.with_suffix(".part")
-    partial.write_text(json.dumps(titles, ensure_ascii=False, indent=1), encoding="utf-8")
+    partial.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     partial.replace(path)
-    return clean
+
+
+def _schematic_file(user: Path) -> Path:
+    return user / META_DIR / SCHEMATIC_FILE
+
+
+def load_schematic(user: Path) -> set[str]:
+    """Позы в схематичном виде. Испорченный файл — «таких нет», а не сбой окна."""
+    try:
+        data = json.loads(_schematic_file(user).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return set()
+    return {str(name) for name in data} if isinstance(data, list) else set()
+
+
+def set_schematic(user: Path, name: str, on: bool) -> None:
+    """Схематичный вид позы: вместо обложки — скелет; обложка не удаляется."""
+    names = load_schematic(user)
+    if on == (name in names):
+        return
+    names = names | {name} if on else names - {name}
+    _write_json(_schematic_file(user), sorted(names))
 
 
 def save_thumb(tile: Image.Image, destination: Path) -> None:

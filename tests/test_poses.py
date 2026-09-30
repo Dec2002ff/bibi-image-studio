@@ -307,6 +307,30 @@ def test_a_redrawn_cover_wins_over_the_catalogue_tile(tmp_path):
     assert Image.open(entry.thumb).getpixel((5, 5))[2] > 100, "плитка каталога прежняя (бирюзовая)"
 
 
+def test_the_schematic_view_shows_the_skeleton_and_keeps_the_cover(tmp_path):
+    catalog, user = tmp_path / "catalog", tmp_path / "user"
+    library.fetch_catalog(catalog, downloader=lambda url: (
+        _catalog_zip(["z_01"]) if url == library.ARCHIVE_URL else _tile_bytes()))
+    library.set_tile(library.list_poses(catalog, user)[0], Image.new("RGB", (1024, 1024), "red"))
+    library.set_schematic(user, "z_01", True)
+    entry = library.list_poses(catalog, user)[0]
+    assert entry.schematic and entry.preview() == entry.skeleton
+    assert entry.cover_thumb.exists(), "обложка не удаляется"
+    library.set_schematic(user, "z_01", False)
+    entry = library.list_poses(catalog, user)[0]
+    assert not entry.schematic and entry.preview() == entry.cover_thumb
+
+
+def test_the_schematic_list_survives_a_damaged_file(tmp_path):
+    user = tmp_path / "user"
+    (user / library.META_DIR).mkdir(parents=True)
+    (user / library.META_DIR / library.SCHEMATIC_FILE).write_text("[ broken", encoding="utf-8")
+    assert library.load_schematic(user) == set()
+    library.set_schematic(user, "a_01", True)
+    library.set_schematic(user, "a_01", True)
+    assert library.load_schematic(user) == {"a_01"}
+
+
 def test_the_cover_prompt_says_the_pose_in_words_and_asks_for_candidates():
     """Непривычную позу модель по скелету не держит — промт говорит её словами."""
     pose = _pose(STANDING)

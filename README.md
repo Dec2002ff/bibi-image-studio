@@ -301,7 +301,8 @@ LowQuality otherwise). Give the pose a name in the field above the photo, or
 it becomes "My pose N".
 
 Each tile shows the pose's name. The pencil in a tile's corner opens its
-editor: rename it or redraw its cover with Qwen-Image. Edits to catalogue
+editor: rename it, redraw its cover with Qwen-Image, or tick **Schematic view**
+to show the bare skeleton when the cover came out wrong. Edits to catalogue
 poses are stored with your data (`user/outputs/poses/meta/`), on top of the
 catalogue, which itself stays unchanged.
 

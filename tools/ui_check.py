@@ -1174,6 +1174,25 @@ def scenario_pose_edit(browser, url, report: Report, fake: FakeGenerator, sample
     titles = library.load_titles(config.user_pose_dir())
     report.check(titles.get("dance_02") == "Hands up", f"stored with the user's data: {titles}")
 
+    # Схематичный вид: скелет вместо обложки в окне и в правке.
+    def tile_src(index: int) -> str:
+        return page.evaluate(
+            f"() => [...({VISIBLE_MODAL_JS})().querySelectorAll('.qs-posegrid img')][{index}]?.src || ''"
+        )
+
+    schematic = visible_input(page, "Schematic view")
+    report.check(not schematic.is_checked(), "a catalogue pose is not schematic by default")
+    schematic.check()
+    page.wait_for_function(
+        f"() => (({VISIBLE_MODAL_JS})()?.innerText || '').includes('shown as a skeleton')", timeout=10000,
+    )
+    page.wait_for_function(
+        f"() => ([...({VISIBLE_MODAL_JS})().querySelectorAll('.qs-posegrid img')][1]?.src || '')"
+        ".includes('dance_02.png')", timeout=10000,
+    )
+    report.check("dance_02" in library.load_schematic(config.user_pose_dir()),
+                 f"“Schematic view” shows the skeleton on the tile: {tile_src(1)[-40:]!r}")
+
     before = len(fake.requests)
     click_text(page, "Redraw cover")
     request = fake.wait(before + 1)
@@ -1183,6 +1202,10 @@ def scenario_pose_edit(browser, url, report: Report, fake: FakeGenerator, sample
     cover = config.user_pose_dir() / library.META_DIR / library.COVERS_DIR / "dance_02.thumb.jpg"
     report.check(request.prompt.startswith(tile.PROMPT) and cover.exists(),
                  "“Redraw cover” asks the model and stores the cover over the catalogue")
+    page.wait_for_timeout(300)
+    report.check(not schematic.is_checked() and "dance_02" not in library.load_schematic(config.user_pose_dir())
+                 and "dance_02.thumb" in tile_src(1),
+                 "a redrawn cover lifts the schematic view")
 
     click_text(page, "Back to poses")
     page.wait_for_timeout(400)

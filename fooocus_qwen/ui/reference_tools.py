@@ -291,6 +291,15 @@ def build(
                                 gr.Button(pick("pose_redraw", lang)),
                                 value=("Перерисовать обложку", "Redraw cover"),
                             )
+                        # Обложка не удалась — показывать вместо неё схему (скелет).
+                        edit_schematic = localizer.bind(
+                            gr.Checkbox(label=pick("pose_schematic", lang), info=pick("pose_schematic_info", lang)),
+                            label=("Схематичный вид", "Schematic view"),
+                            info=(
+                                "показывать вместо обложки скелет позы — если обложка не удалась",
+                                "show the pose skeleton instead of the cover — when the cover came out wrong",
+                            ),
+                        )
                         edit_back = localizer.bind(
                             gr.Button(pick("pose_back", lang), size="sm"), value=("К позам", "Back to poses")
                         )
@@ -351,12 +360,12 @@ def build(
         загрузки; карандаш (``action == "edit"``) — правка имени и обложки.
 
         Выходы: запись в сетку, окно, поле загрузки, сообщение, затем панель
-        правки (панель, заголовок, обложка, имя, какая поза) и сама галерея —
+        правки (панель, заголовок, обложка, имя, схема, какая поза) и сама галерея —
         её выбор сбрасывается, чтобы плитку можно было нажать снова.
         """
         chosen = selected_index(event)
         keep = (gr.update(),) * (1 + 2 * MAX_REFERENCES + 1)
-        no_edit = (gr.Column(visible=False), gr.update(), gr.update(), gr.update(), gr.update())
+        no_edit = (gr.Column(visible=False), gr.update(), gr.update(), gr.update(), gr.update(), gr.update())
         reset = gr.Gallery(selected_index=None)
         if chosen is None:
             return (*keep, gr.update(), gr.update(), "", *no_edit, reset)
@@ -370,7 +379,7 @@ def build(
             return (
                 *keep, gr.update(), gr.Column(visible=False), "",
                 gr.Column(visible=True), say("pose_edit_title", lang, title=title),
-                str(entry.preview()), entry.title or title, entry.name, reset,
+                str(entry.preview()), entry.title or title, entry.schematic, entry.name, reset,
             )
         with Image.open(entry.skeleton) as opened:
             image = opened.convert("RGB")
@@ -397,6 +406,17 @@ def build(
             [item.name for item in entries], pose_tiles(entries, lang),
             say("pose_edit_title", lang, title=title), message,
         )
+
+    def set_schematic(name, on, lang):
+        """Схематичный вид: скелет вместо обложки в окне и в правке."""
+        entry = _entry(name) if name else None
+        if entry is None:
+            return gr.update(), gr.update(), say("pose_missing", lang), gr.update()
+        library.set_schematic(config.user_pose_dir(), entry.name, bool(on))
+        entries = library.list_poses(config.POSE_LIBRARY_DIR, config.user_pose_dir())
+        fresh = _entry(entry.name) or entry
+        message = say("pose_schematic_on" if on else "pose_schematic_off", lang)
+        return [item.name for item in entries], pose_tiles(entries, lang), message, str(fresh.preview())
 
     def back_to_poses():
         return gr.Column(visible=False), ""
@@ -439,11 +459,19 @@ def build(
         return _draw(name, lang, progress, "pose_tile_done")
 
     def redraw_cover(name, lang, progress=gr.Progress()):
-        """«Перерисовать обложку» в правке позы — тот же рисунок, другое сообщение."""
-        return _draw(name, lang, progress, "pose_cover_done")
+        """«Перерисовать обложку» в правке позы — тот же рисунок, другое сообщение.
 
-    def _draw(name, lang, progress, done_key: str):
-        """Рисует обложку и отдаёт: имена поз, плитки, сообщение, новую обложку."""
+        Новую обложку перерисовывают, чтобы видеть: схематичный вид снимается.
+        """
+        drawn = _draw(name, lang, progress, "pose_cover_done", show_cover=True)
+        entry = _entry(name) if name else None
+        return (*drawn, entry.schematic if entry else gr.update())
+
+    def _draw(name, lang, progress, done_key: str, show_cover: bool = False):
+        """Рисует обложку и отдаёт: имена поз, плитки, сообщение, новую обложку.
+
+        ``show_cover`` — снять с позы схематичный вид, когда обложка готова.
+        """
         entry = _entry(name) if name else None
         if entry is None:
             return gr.update(), gr.update(), gr.update(), gr.update()
@@ -471,6 +499,8 @@ def build(
             except Exception:  # noqa: BLE001 — без распознавания остаётся первый кандидат
                 LOGGER.exception("Could not score the cover candidates; keeping the first one")
         library.set_tile(entry, chosen)
+        if show_cover:
+            library.set_schematic(config.user_pose_dir(), entry.name, False)
         entries = library.list_poses(config.POSE_LIBRARY_DIR, config.user_pose_dir())
         fresh = _entry(entry.name)
         return (
@@ -530,7 +560,7 @@ def build(
         pick_pose,
         [pick_mode, target, entries_state, references, mode, language],
         [*reference_targets, pose_window, add_panel, pose_message,
-         edit_panel, edit_heading, edit_cover, edit_name, editing, pose_grid],
+         edit_panel, edit_heading, edit_cover, edit_name, edit_schematic, editing, pose_grid],
         js=PICK_JS,
         show_progress="hidden",
     )
@@ -551,8 +581,14 @@ def build(
         [entries_state, pose_grid, edit_heading, pose_message], show_progress="hidden",
     )
     redraw.click(
-        redraw_cover, [editing, language], [entries_state, pose_grid, pose_message, edit_cover],
+        redraw_cover, [editing, language],
+        [entries_state, pose_grid, pose_message, edit_cover, edit_schematic],
         concurrency_id=GPU_CONCURRENCY_ID,
+    )
+    # input, а не change: флажок ставит и выбор позы, это не решение человека.
+    edit_schematic.input(
+        set_schematic, [editing, edit_schematic, language],
+        [entries_state, pose_grid, pose_message, edit_cover], show_progress="hidden",
     )
     edit_back.click(back_to_poses, None, [edit_panel, pose_message], queue=False)
     pose_close.click(close, None, pose_window, queue=False)
@@ -576,6 +612,7 @@ def build(
         "pose_name": pose_name,
         "edit_panel": edit_panel,
         "edit_name": edit_name,
+        "edit_schematic": edit_schematic,
         "sketch_window": sketch_window,
         "sketch": sketch,
     }
