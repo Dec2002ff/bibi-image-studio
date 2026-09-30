@@ -25,6 +25,11 @@
 переписываются: правки лежат поверх него. Свои позы перерисовывают
 собственную обложку.
 
+**Удаление.** Своя поза удаляется с диска целиком. Поза каталога —
+поставка, её файлы не трогаются: она скрывается (``hidden.json``), а её
+перерисованная обложка удаляется; вернуть скрытые — удалить этот файл.
+Имя и схематичный вид удалённой позы забываются в обоих случаях.
+
 **Схематичный вид** — когда обложка не удалась (модель не держит позу), её
 можно не показывать: вместо неё в окне стоит сам скелет. Обложка при этом
 не удаляется — флажок снят, и она снова на месте.
@@ -59,6 +64,7 @@ CUSTOM_PREFIX = "custom_"
 META_DIR = "meta"
 TITLES_FILE = "titles.json"
 SCHEMATIC_FILE = "schematic.json"
+HIDDEN_FILE = "hidden.json"
 COVERS_DIR = "covers"
 MAX_TITLE = 60
 
@@ -125,10 +131,12 @@ def list_poses(catalog: Path, user: Path) -> list[PoseEntry]:
     """Каталог по имени, затем свои позы в порядке добавления — с именами и обложками."""
     titles = load_titles(user)
     schematic = load_schematic(user)
+    hidden = _load_names(user / META_DIR / HIDDEN_FILE)
     covers = user / META_DIR / COVERS_DIR
     entries = [
         PoseEntry(entry.name, entry.folder, False, titles.get(entry.name, ""), covers, entry.name in schematic)
         for entry in _entries(catalog, custom=False)
+        if entry.name not in hidden
     ]
     entries += [
         PoseEntry(entry.name, entry.folder, True, titles.get(entry.name, ""), None, entry.name in schematic)
@@ -174,22 +182,44 @@ def _schematic_file(user: Path) -> Path:
     return user / META_DIR / SCHEMATIC_FILE
 
 
-def load_schematic(user: Path) -> set[str]:
-    """Позы в схематичном виде. Испорченный файл — «таких нет», а не сбой окна."""
+def _load_names(path: Path) -> set[str]:
+    """Список имён поз из файла правок. Испорченный файл — «таких нет», а не сбой окна."""
     try:
-        data = json.loads(_schematic_file(user).read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return set()
     return {str(name) for name in data} if isinstance(data, list) else set()
 
 
-def set_schematic(user: Path, name: str, on: bool) -> None:
-    """Схематичный вид позы: вместо обложки — скелет; обложка не удаляется."""
-    names = load_schematic(user)
+def _mark(path: Path, name: str, on: bool) -> None:
+    names = _load_names(path)
     if on == (name in names):
         return
-    names = names | {name} if on else names - {name}
-    _write_json(_schematic_file(user), sorted(names))
+    _write_json(path, sorted(names | {name} if on else names - {name}))
+
+
+def load_schematic(user: Path) -> set[str]:
+    """Позы в схематичном виде."""
+    return _load_names(_schematic_file(user))
+
+
+def set_schematic(user: Path, name: str, on: bool) -> None:
+    """Схематичный вид позы: вместо обложки — скелет; обложка не удаляется."""
+    _mark(_schematic_file(user), name, on)
+
+
+def delete(user: Path, entry: PoseEntry) -> None:
+    """Удаляет позу: свою — с диска, каталога — скрывает (см. описание модуля)."""
+    if entry.custom:
+        paths = (entry.keypoints, entry.skeleton, entry.tile, entry.thumb)
+    else:
+        _mark(user / META_DIR / HIDDEN_FILE, entry.name, True)
+        paths = (entry.cover_tile, entry.cover_thumb)
+    for path in paths:
+        path.unlink(missing_ok=True)
+    if entry.name in load_titles(user):
+        set_title(user, entry.name, "")
+    set_schematic(user, entry.name, False)
 
 
 def save_thumb(tile: Image.Image, destination: Path) -> None:

@@ -300,9 +300,23 @@ def build(
                                 "show the pose skeleton instead of the cover — when the cover came out wrong",
                             ),
                         )
-                        edit_back = localizer.bind(
-                            gr.Button(pick("pose_back", lang), size="sm"), value=("К позам", "Back to poses")
-                        )
+                        with gr.Row():
+                            edit_back = localizer.bind(
+                                gr.Button(pick("pose_back", lang), size="sm"), value=("К позам", "Back to poses")
+                            )
+                            remove = localizer.bind(
+                                gr.Button(pick("pose_delete", lang), size="sm"),
+                                value=("Удалить позу", "Delete pose"),
+                            )
+                        # Удаление — только после подтверждения.
+                        with gr.Row(visible=False) as confirm_row:
+                            remove_yes = localizer.bind(
+                                gr.Button(pick("pose_delete_yes", lang), variant="stop", size="sm"),
+                                value=("Да, удалить", "Yes, delete"),
+                            )
+                            remove_no = localizer.bind(
+                                gr.Button(pick("modal_cancel", lang), size="sm"), value=("Отмена", "Cancel")
+                            )
             pose_message = gr.Markdown(elem_classes=[layout.MODAL_MESSAGE])
             with gr.Row():
                 pose_close = localizer.bind(
@@ -360,12 +374,16 @@ def build(
         загрузки; карандаш (``action == "edit"``) — правка имени и обложки.
 
         Выходы: запись в сетку, окно, поле загрузки, сообщение, затем панель
-        правки (панель, заголовок, обложка, имя, схема, какая поза) и сама галерея —
+        правки (панель, заголовок, обложка, имя, схема, какая поза, подтверждение
+        удаления) и сама галерея —
         её выбор сбрасывается, чтобы плитку можно было нажать снова.
         """
         chosen = selected_index(event)
         keep = (gr.update(),) * (1 + 2 * MAX_REFERENCES + 1)
-        no_edit = (gr.Column(visible=False), gr.update(), gr.update(), gr.update(), gr.update(), gr.update())
+        no_edit = (
+            gr.Column(visible=False), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(),
+            gr.Row(visible=False),
+        )
         reset = gr.Gallery(selected_index=None)
         if chosen is None:
             return (*keep, gr.update(), gr.update(), "", *no_edit, reset)
@@ -379,7 +397,8 @@ def build(
             return (
                 *keep, gr.update(), gr.Column(visible=False), "",
                 gr.Column(visible=True), say("pose_edit_title", lang, title=title),
-                str(entry.preview()), entry.title or title, entry.schematic, entry.name, reset,
+                str(entry.preview()), entry.title or title, entry.schematic, entry.name,
+                gr.Row(visible=False), reset,
             )
         with Image.open(entry.skeleton) as opened:
             image = opened.convert("RGB")
@@ -418,8 +437,32 @@ def build(
         message = say("pose_schematic_on" if on else "pose_schematic_off", lang)
         return [item.name for item in entries], pose_tiles(entries, lang), message, str(fresh.preview())
 
+    def ask_delete(name, lang):
+        """Первый шаг удаления: что именно будет удалено — и кнопки подтверждения."""
+        entry = _entry(name) if name else None
+        if entry is None:
+            return gr.update(), say("pose_missing", lang)
+        key = "pose_delete_ask" if entry.custom else "pose_delete_ask_catalog"
+        return gr.Row(visible=True), say(key, lang, title=_title_of(entry, lang))
+
+    def delete_pose(name, lang):
+        """Удаление после подтверждения: поза уходит из окна, правка закрывается."""
+        entry = _entry(name) if name else None
+        if entry is None:
+            return gr.update(), gr.update(), say("pose_missing", lang), gr.update(), gr.update(), gr.update()
+        title = _title_of(entry, lang)
+        library.delete(config.user_pose_dir(), entry)
+        entries = library.list_poses(config.POSE_LIBRARY_DIR, config.user_pose_dir())
+        return (
+            [item.name for item in entries], pose_tiles(entries, lang), say("pose_deleted", lang, title=title),
+            gr.Column(visible=False), gr.Row(visible=False), "",
+        )
+
+    def cancel_delete():
+        return gr.Row(visible=False), ""
+
     def back_to_poses():
-        return gr.Column(visible=False), ""
+        return gr.Column(visible=False), gr.Row(visible=False), ""
 
     def add_pose(photo, title_text, index, current, mode_value, lang):
         """Фото → скелет → своя поза (с именем, если задано) → в ячейку.
@@ -498,6 +541,8 @@ def build(
                 chosen = tile.best([item.image for item in produced], pose, studio.pose_detector())
             except Exception:  # noqa: BLE001 — без распознавания остаётся первый кандидат
                 LOGGER.exception("Could not score the cover candidates; keeping the first one")
+        if _entry(entry.name) is None:
+            return gr.update(), gr.update(), gr.update(), gr.update()
         library.set_tile(entry, chosen)
         if show_cover:
             library.set_schematic(config.user_pose_dir(), entry.name, False)
@@ -560,7 +605,7 @@ def build(
         pick_pose,
         [pick_mode, target, entries_state, references, mode, language],
         [*reference_targets, pose_window, add_panel, pose_message,
-         edit_panel, edit_heading, edit_cover, edit_name, edit_schematic, editing, pose_grid],
+         edit_panel, edit_heading, edit_cover, edit_name, edit_schematic, editing, confirm_row, pose_grid],
         js=PICK_JS,
         show_progress="hidden",
     )
@@ -590,7 +635,13 @@ def build(
         set_schematic, [editing, edit_schematic, language],
         [entries_state, pose_grid, pose_message, edit_cover], show_progress="hidden",
     )
-    edit_back.click(back_to_poses, None, [edit_panel, pose_message], queue=False)
+    edit_back.click(back_to_poses, None, [edit_panel, confirm_row, pose_message], queue=False)
+    remove.click(ask_delete, [editing, language], [confirm_row, pose_message], show_progress="hidden")
+    remove_no.click(cancel_delete, None, [confirm_row, pose_message], queue=False)
+    remove_yes.click(
+        delete_pose, [editing, language],
+        [entries_state, pose_grid, pose_message, edit_panel, confirm_row, editing], show_progress="hidden",
+    )
     pose_close.click(close, None, pose_window, queue=False)
 
     sketch_outputs = [target, sketch_window, sketch_title, sketch, sketch_message]

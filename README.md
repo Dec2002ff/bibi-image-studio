@@ -302,7 +302,9 @@ it becomes "My pose N".
 
 Each tile shows the pose's name. The pencil in a tile's corner opens its
 editor: rename it, redraw its cover with Qwen-Image, or tick **Schematic view**
-to show the bare skeleton when the cover came out wrong. Edits to catalogue
+to show the bare skeleton when the cover came out wrong. **Delete pose** removes
+your own pose from the disk; a catalogue pose is only hidden
+(`user/outputs/poses/meta/hidden.json`). Edits to catalogue
 poses are stored with your data (`user/outputs/poses/meta/`), on top of the
 catalogue, which itself stays unchanged.
 

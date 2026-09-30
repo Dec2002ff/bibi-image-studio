@@ -218,11 +218,12 @@ def test_the_pencil_opens_the_edit_panel_and_leaves_the_cells(poses):
     _studio, _components, found = _handlers()
     outputs = found["pick_pose"][0].fn("edit", 3, ["dance_01", "standing_01"], [], None, "ru", _event(1))
     grid, slots, _tags, _status, rest = _split(outputs)
-    window, add_panel, message, edit_panel, heading, cover, name, schematic, editing, gallery = rest
+    window, add_panel, message, edit_panel, heading, cover, name, schematic, editing, confirm, gallery = rest
     assert _untouched(grid) and all(_untouched(slot) for slot in slots), "правка не кладёт позу в ячейку"
     assert _untouched(window) and _visible(edit_panel) is True
     assert editing == "standing_01" and name == "Стоя 1" and "Стоя 1" in heading
     assert cover.endswith("standing_01.thumb.jpg") and schematic is False
+    assert _visible(confirm) is False, "подтверждение удаления прежней позы убрано"
     assert gallery.selected_index is None, "выбор сброшен — плитку можно нажать снова"
 
 
@@ -266,3 +267,31 @@ def test_the_schematic_view_puts_the_skeleton_in_place_of_the_cover(poses):
     assert library.load_schematic(user) == {"dance_01"}
     names, tiles, message, cover = toggle("dance_01", False, "ru")
     assert cover.endswith("dance_01.thumb.jpg") and "на месте" in message
+
+
+def test_deleting_asks_first_and_then_removes_an_own_pose(poses, monkeypatch):
+    catalog, user = poses
+    _studio, _components, found = _handlers(_recognising_studio(monkeypatch))
+    outputs = found["add_pose"][0].fn(Image.new("RGB", (300, 400)), "Лишняя", 0, [], None, "ru")
+    name = outputs[-1]
+    library.set_schematic(user, name, True)
+    confirm, message = found["ask_delete"][0].fn(name, "ru")
+    assert _visible(confirm) is True and "Лишняя" in message and "нельзя" in message
+    assert (user / f"{name}.json").exists(), "первый шаг ничего не удаляет"
+    names, tiles, message, panel, confirm, editing = found["delete_pose"][0].fn(name, "ru")
+    assert name not in names and "удалена" in message and _visible(panel) is False and editing == ""
+    assert not list(user.glob(f"{name}*")), "файлы позы удалены с диска"
+    assert name not in library.load_titles(user) and name not in library.load_schematic(user)
+
+
+def test_deleting_a_catalogue_pose_hides_it_and_keeps_the_catalogue(poses):
+    catalog, user = poses
+    before = sorted(path.name for path in catalog.iterdir())
+    _studio, _components, found = _handlers()
+    confirm, message = found["ask_delete"][0].fn("dance_01", "ru")
+    assert "hidden.json" in message
+    names, *_rest = found["delete_pose"][0].fn("dance_01", "ru")
+    assert "dance_01" not in names
+    assert sorted(path.name for path in catalog.iterdir()) == before, "каталог — поставка, его файлы не трогаются"
+    (user / library.META_DIR / library.HIDDEN_FILE).unlink()
+    assert "dance_01" in [entry.name for entry in library.list_poses(catalog, user)], "вернуть — удалить hidden.json"

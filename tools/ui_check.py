@@ -1230,6 +1230,28 @@ def scenario_pose_edit(browser, url, report: Report, fake: FakeGenerator, sample
         timeout=60000,
     )
     report.check(True, "a pose added with a name shows it under its tile")
+
+    # Удаление: сначала вопрос, потом поза уходит с диска и из окна.
+    victory = next(entry for entry in library.list_poses(config.POSE_LIBRARY_DIR, config.user_pose_dir())
+                   if entry.title == "Victory")
+    page.wait_for_timeout(1500)  # плитка ещё рисуется: подделка отвечает быстро, но ответ идёт очередью
+    page.locator(".qs-posegrid:visible .qs-poseedit").nth(total).click()
+    page.wait_for_function(
+        f"() => (({VISIBLE_MODAL_JS})()?.innerText || '').includes('Pose “Victory”')", timeout=10000,
+    )
+    click_text(page, "Delete pose")
+    page.wait_for_function(
+        f"() => (({VISIBLE_MODAL_JS})()?.innerText || '').includes('cannot be undone')", timeout=10000,
+    )
+    page.screenshot(path=str(samples.parent / "pose-delete.png"))
+    report.check(victory.keypoints.exists(), "“Delete pose” asks first and deletes nothing yet")
+    click_text(page, "Yes, delete")
+    page.wait_for_function(
+        f"() => (({VISIBLE_MODAL_JS})()?.innerText || '').includes('Pose “Victory” deleted')", timeout=10000,
+    )
+    left = list(victory.folder.glob(f"{victory.name}*"))
+    report.check(not left and "Victory" not in pose_grid_text(page),
+                 f"after confirming, the pose is gone from the disk and the window: {left}")
     report.check(not errors, "no page errors" + (f": {errors[:2]}" if errors else ""))
     page.close()
 

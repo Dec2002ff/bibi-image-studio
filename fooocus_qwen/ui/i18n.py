@@ -100,6 +100,8 @@ T: dict[str, tuple[str, str]] = {
     "pose_redraw": ("Перерисовать обложку", "Redraw cover"),
     "pose_back": ("К позам", "Back to poses"),
     "pose_schematic": ("Схематичный вид", "Schematic view"),
+    "pose_delete": ("Удалить позу", "Delete pose"),
+    "pose_delete_yes": ("Да, удалить", "Yes, delete"),
     "pose_schematic_info": (
         "показывать вместо обложки скелет позы — если обложка не удалась",
         "show the pose skeleton instead of the cover — when the cover came out wrong",
@@ -362,6 +364,17 @@ MESSAGES: dict[str, tuple[str, str]] = {
         "The pose is shown as a skeleton; the cover is kept — untick to bring it back",
     ),
     "pose_schematic_off": ("Обложка снова на месте", "The cover is back"),
+    "pose_delete_ask": (
+        "Удалить позу «{title}» вместе с её скелетом и обложкой? Вернуть её будет нельзя.",
+        "Delete the pose “{title}” with its skeleton and cover? It cannot be undone.",
+    ),
+    "pose_delete_ask_catalog": (
+        "Убрать позу каталога «{title}» из окна? Каталог не меняется: вернуть позу можно, "
+        "удалив user/outputs/poses/meta/hidden.json.",
+        "Remove the catalogue pose “{title}” from the window? The catalogue itself is kept: "
+        "delete user/outputs/poses/meta/hidden.json to bring it back.",
+    ),
+    "pose_deleted": ("Поза «{title}» удалена", "Pose “{title}” deleted"),
     "pose_title": ("**Поза для ячейки {cell}**", "**Pose for cell {cell}**"),
     "pose_add_hint": (
         "Выберите фото человека в нужной позе: поза будет распознана и положена в ячейку, "
