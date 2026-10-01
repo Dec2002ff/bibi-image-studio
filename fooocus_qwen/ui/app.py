@@ -181,6 +181,7 @@ def build(cfg: config.AppConfig, return_studio: bool = False):
                     settings_components["precision"],
                     settings_components["sage"],
                     settings_components["performance_status"],
+                    settings_components["memory_profile"],
                 ],
                 queue=False,
             )

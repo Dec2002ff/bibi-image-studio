@@ -48,17 +48,38 @@ def selftest() -> int:
 
     # Производительность: выбор из user/settings.json и то, что ему нужно.
     from . import settings
-    from .engine import attention, fetch
+    from .engine import attention, fetch, hardware, text_encoder
 
     chosen = settings.load()
+    vram = hardware.vram_gib()
+    profile = settings.resolve_profile(chosen.memory_profile, vram)
+    print(f"[ok ] memory profile: {profile} (setting: {chosen.memory_profile})")
     if chosen.precision == settings.PRECISION_INT8:
         if fetch.missing_extra(config.INT8_DIR, (fetch.INT8_FILE,)):
             problems.append("INT8 precision is selected but its weights are missing: run --fetch-model")
             print(f"[no ] INT8 precision: missing {config.INT8_DIR / fetch.INT8_FILE}")
         else:
             print("[ok ] INT8 precision, weights found")
+    elif settings.is_gguf(chosen.precision):
+        name = fetch.gguf_file(chosen.precision)
+        if fetch.missing_extra(config.GGUF_DIR, (name,)):
+            problems.append(f"GGUF {chosen.precision} is selected but its file is missing: run --fetch-model")
+            print(f"[no ] GGUF {chosen.precision}: missing {config.GGUF_DIR / name}")
+        else:
+            print(f"[ok ] GGUF {chosen.precision}, weights found")
     else:
         print("[ok ] bf16 precision")
+    recommended = settings.recommended_precision(vram)
+    order = settings.PRECISIONS
+    if vram is not None and order.index(chosen.precision) < order.index(recommended):
+        # Список точностей идёт от тяжёлой к лёгкой: выбранная тяжелее
+        # рекомендованной — вероятна нехватка видеопамяти.
+        print(f"[!! ] {chosen.precision} may not fit in {vram:.1f} GiB of VRAM; {recommended} is recommended")
+    if profile == settings.MEMORY_LOW:
+        if text_encoder.is_current(config.TE_INT8_DIR, config.MODEL_DIR / "text_encoder"):
+            print("[ok ] INT8 text encoder built")
+        else:
+            print("[--] INT8 text encoder will be built on first start (about 20 s): or run --fetch-model")
     if chosen.sage_attention:
         state = (
             "[ok ] SageAttention enabled" if attention.sage_available()
@@ -72,8 +93,10 @@ def selftest() -> int:
         print(f"[no ] pose detection: DWPose weights missing in {config.DWPOSE_DIR}")
     else:
         print("[ok ] pose detection: DWPose weights found")
-    turbo_ready = not fetch.missing_extra(config.TURBO_DIR, fetch.TURBO_FILES)
+    turbo_ready = not fetch.missing_extra(config.TURBO_DIR, fetch.turbo_files(profile == settings.MEMORY_LOW))
     print("[ok ] Turbo: weights found" if turbo_ready else "[--] Turbo: weights will be downloaded when the preset is first selected")
+    turbo4_ready = not fetch.turbo4_missing(config.GGUF_DIR, config.TURBO_DIR)
+    print("[ok ] Turbo4: weights found" if turbo4_ready else "[--] Turbo4: weights will be downloaded when the preset is first selected")
 
     if problems:
         print("\nNot ready:")
@@ -131,22 +154,37 @@ def generate_once(args) -> int:
 
 
 def fetch_model() -> int:
-    """Доводит веса до полного состава под выбранную точность. Зовётся установкой.
+    """Доводит веса до полного состава под выбранную точность и профиль. Зовётся установкой.
 
-    При INT8 bf16-шарды трансформера (14 ГБ) не качаются: их место занимает
-    INT8-трансформер Unsloth (7.3 ГБ). Вместе с моделью — веса распознавания
-    позы (DWPose, 350 МБ, «Добавить позу»): без них первое распознавание
-    ждало бы загрузки посреди работы.
+    При INT8 и GGUF bf16-шарды трансформера (14 ГБ) не качаются: их место
+    занимает INT8-трансформер Unsloth (7.3 ГБ) или файл GGUF (2.9–7.1 ГБ). В
+    профиле памяти «low» здесь же собирается INT8-копия текстового энкодера
+    (``engine/text_encoder.py``, около 20 с на видеокарте); собранная, она
+    заменяет bf16-шарды энкодера, и те больше не качаются. Вместе с моделью —
+    веса распознавания позы (DWPose, 350 МБ, «Добавить позу»): без них первое
+    распознавание ждало бы загрузки посреди работы.
     """
     from . import settings
-    from .engine import fetch
+    from .engine import fetch, hardware, text_encoder
     from .poses import detect
 
-    int8 = settings.load().precision == settings.PRECISION_INT8
+    chosen = settings.load()
+    int8 = chosen.precision == settings.PRECISION_INT8
+    gguf = settings.is_gguf(chosen.precision)
+    low = settings.resolve_profile(chosen.memory_profile, hardware.vram_gib()) == settings.MEMORY_LOW
+    te_source = config.MODEL_DIR / "text_encoder"
+    te_ready = low and text_encoder.is_current(config.TE_INT8_DIR, te_source)
     try:
-        downloaded = fetch.ensure_model(config.MODEL_DIR, include_transformer=not int8)
+        downloaded = fetch.ensure_model(
+            config.MODEL_DIR, include_transformer=not (int8 or gguf), include_text_encoder=not te_ready
+        )
         if int8:
             downloaded = fetch.ensure_int8(config.INT8_DIR) or downloaded
+        if gguf:
+            downloaded = fetch.ensure_gguf(config.GGUF_DIR, chosen.precision) or downloaded
+        if low and not te_ready:
+            text_encoder.ensure(te_source, config.TE_INT8_DIR, out=lambda line: print(f"  {line}"))
+            print(f"[ok ] INT8 text encoder built: {config.TE_INT8_DIR}")
         poses = fetch.ensure_files(config.DWPOSE_DIR, detect.REPO, detect.FILES)
     except fetch.ModelDownloadError as error:
         print(f"[no ] {error}")

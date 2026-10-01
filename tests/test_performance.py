@@ -30,7 +30,7 @@ def test_settings_round_trip():
     settings_module.save(settings_module.Settings("int8", True))
     assert settings_module.load() == settings_module.Settings("int8", True)
     assert json.loads(config.SETTINGS_FILE.read_text(encoding="utf-8")) == {
-        "precision": "int8", "sage_attention": True,
+        "precision": "int8", "sage_attention": True, "memory_profile": "auto",
     }
 
 
@@ -95,8 +95,24 @@ def test_no_console_keeps_the_defaults():
     def no_console(_question):
         raise EOFError
 
-    chosen = perf_setup.configure(ask=no_console, out=lambda *_a: None, sage_available=lambda: False)
+    chosen = perf_setup.configure(ask=no_console, out=lambda *_a: None, sage_available=lambda: False, vram_gib=24.0)
     assert chosen == settings_module.Settings()
+
+
+@pytest.mark.parametrize(("vram", "expected"), [(8.0, "Q4_K_M"), (None, "Q4_K_M"), (11.0, "Q8_0"), (16.0, "int8"), (24.0, "bf16")])
+def test_a_fresh_install_proposes_what_fits_the_card(vram, expected):
+    """Без прежнего выбора Enter берёт точность, которая помещается в найденную карту."""
+    chosen = perf_setup.configure(ask=_answers("", ""), out=lambda *_a: None, sage_available=lambda: False, vram_gib=vram)
+    assert chosen.precision == expected
+
+
+def test_any_precision_can_be_chosen_by_number():
+    """Расширение, а не замена: и bf16, и любой GGUF выбираются на любой карте."""
+    for number, name in enumerate(settings_module.PRECISIONS, start=1):
+        chosen = perf_setup.configure(
+            ask=_answers(str(number), "нет"), out=lambda *_a: None, sage_available=lambda: False, vram_gib=8.0
+        )
+        assert chosen.precision == name
 
 
 @pytest.mark.parametrize(

@@ -1266,9 +1266,17 @@ def scenario_performance(browser, url, report: Report, fake: FakeGenerator) -> N
     open_tab(page, 3)
     page.wait_for_timeout(800)
     status = " ".join(box.input_value() for box in page.locator("textarea").all())
-    report.check("Precision: BF16" in status, "status shows precision and Turbo")
-    report.check(page.get_by_label("bf16 — original precision, 13.3 GiB of VRAM").is_checked(),
-                 "current precision is selected")
+    report.check("Precision: BF16" in status and "Memory profile:" in status,
+                 "status shows precision, memory profile and Turbo")
+    # Точность — выпадающий список (вариантов восемь: bf16, INT8 и GGUF).
+    chosen = page.get_by_label("Transformer precision").input_value()
+    report.check(chosen.startswith("bf16 — original precision"), f"current precision is selected: {chosen!r}")
+    page.get_by_label("Transformer precision").click()
+    page.wait_for_timeout(300)
+    report.check(page.get_by_role("option", name="GGUF Q4_K_M — 3.9 GiB (recommended for 6–8 GB)").count() == 1,
+                 "GGUF variants are offered next to bf16 and INT8")
+    page.keyboard.press("Escape")
+    report.check(page.get_by_label("Auto — by the amount of VRAM").is_checked(), "memory profile Auto is selected")
 
     sage = page.get_by_label("SageAttention — fast attention")
     if not attention.sage_available():

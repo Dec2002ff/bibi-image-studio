@@ -56,7 +56,7 @@ def _studio(monkeypatch, loader_stub) -> Studio:
     monkeypatch.setattr("fooocus_qwen.engine.loader.load", loader_stub)
     monkeypatch.setattr(
         "fooocus_qwen.engine.generator.Generator",
-        lambda pipe, residency, cache, catalogue, turbo=None: pipe,
+        lambda pipe, residency, cache, catalogue, turbo=None, turbo4=None: pipe,
     )
     return Studio(config.AppConfig())
 

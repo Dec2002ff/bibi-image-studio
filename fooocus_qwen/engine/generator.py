@@ -25,6 +25,7 @@ from PIL import Image
 from .. import __version__
 from ..imaging import aspect, masking
 from ..prompting.styles import Style, apply_styles
+from . import presets as presets_module
 from . import turbo as turbo_module
 from .embeds_cache import EmbedsCache
 from .presets import QualityPreset
@@ -258,6 +259,7 @@ class Generator:
         cache: EmbedsCache,
         catalogue: dict[str, Style],
         turbo=None,
+        turbo4=None,
     ) -> None:
         self._pipe = pipe
         self._residency = residency
@@ -266,6 +268,9 @@ class Generator:
         # Адаптер turbo (``engine/turbo.py``) или None: без него пресет Turbo
         # недоступен, остальные работают как всегда.
         self._turbo = turbo
+        # Подмена трансформера на 4-шаговый дистиллят (``Turbo4Transformer``)
+        # или None: без неё пресет Turbo4 недоступен.
+        self._turbo4 = turbo4
         self._interrupted = False
         self._lock = threading.Lock()
 
@@ -344,9 +349,16 @@ class Generator:
 
         prepared, region_box = self._prepare(request)
         use_turbo = prepared.preset.turbo
+        use_turbo4 = prepared.preset.transformer == presets_module.TURBO4
         if use_turbo and self._turbo is None:
             raise RuntimeError("Turbo preset is unavailable: the turbo adapter is not attached")
-        if self._turbo is not None:
+        if use_turbo4 and self._turbo4 is None:
+            raise RuntimeError("Turbo4 preset is unavailable: the Turbo4 transformer is not configured")
+        if self._turbo4 is not None:
+            # Сначала трансформер: адаптер Turbo живёт на основном, и
+            # включать его можно только когда основной на месте.
+            self._turbo4.activate(use_turbo4)
+        if self._turbo is not None and not use_turbo4:
             # Внутри замка генерации: адаптер и планировщик — общее состояние
             # пайплайна, и переключать их посреди чужого цикла нельзя.
             self._turbo.activate(use_turbo)
@@ -388,6 +400,8 @@ class Generator:
             )
             if use_turbo:
                 arguments = turbo_module.call_arguments(arguments)
+            elif use_turbo4:
+                arguments = turbo_module.call_arguments4(arguments)
             output = self._pipe(**arguments)
 
             if self._interrupted:

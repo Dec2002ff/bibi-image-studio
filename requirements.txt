@@ -29,6 +29,9 @@ peft>=0.21
 # загрузка идёт через его prototype-API (safetensors_support), который
 # между выпусками меняется.
 torchao==0.18.0
+# Трансформер GGUF для карт на 6–12 ГБ (engine/gguf.py): чтение файла;
+# разжатие весов — в diffusers.
+gguf>=0.10.0
 
 # SageAttention (необязательно) ставит install.ps1 на шаге выбора
 # производительности: под Windows — готовая сборка и triton-windows под версию

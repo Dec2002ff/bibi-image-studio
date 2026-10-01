@@ -20,7 +20,14 @@
   Кто выбрал INT8, bf16-шарды трансформера (14 ГБ) не качает вовсе:
   ``include_transformer=False``.
 * **Адаптер turbo** (``Viggle/Qwen-Image-2.1-viggle-turbo``, 1.3 ГБ) —
-  дистиллят на 6 шагов, нужен пресету Turbo.
+  дистиллят на 6 шагов, нужен пресету Turbo. Для профиля «low» — тот же
+  дистиллят ранга 128 (0.63 ГБ): на карте в 8 ГБ каждые полгигабайта на счету.
+* **Трансформер GGUF** (``unsloth/Qwen-Image-2.1-GGUF``, 3–7 ГБ по варианту)
+  — для карт на 6–12 ГБ (``engine/gguf.py``).
+
+Текстовый энкодер в INT8 для профиля «low» не качается, а собирается из
+bf16-весов основной модели (``engine/text_encoder.py``). Когда он собран,
+bf16-шарды энкодера (16.3 ГБ) больше не нужны: ``include_text_encoder=False``.
 
 Прогресс скачивания рисует ``tqdm`` внутри ``huggingface_hub``: в консоли
 установки он виден как есть, а интерфейс подхватывает его через
@@ -48,21 +55,44 @@ INT8_FILE = "Qwen-Image-2.1-INT8.safetensors"
 
 TURBO_REPO = "Viggle/Qwen-Image-2.1-viggle-turbo"
 TURBO_LORA = "Qwen-Image-2.1-viggle-turbo-v0.2.1-6step-lora-r256.safetensors"
+TURBO_LORA_LIGHT = "Qwen-Image-2.1-viggle-turbo-v0.2.1-6step-lora-r128.safetensors"
 TURBO_SCHEDULER = "scheduler/scheduler_config.json"
 TURBO_FILES = (TURBO_LORA, TURBO_SCHEDULER)
+TURBO_FILES_LIGHT = (TURBO_LORA_LIGHT, TURBO_SCHEDULER)
+
+GGUF_REPO = "unsloth/Qwen-Image-2.1-GGUF"
+# Пресет Turbo4: 4-шаговый дистиллят Viggle (предварительная версия v0.1),
+# влитый в трансформер и сжатый Abiray в GGUF Q4_K_M — отдельный трансформер,
+# 4.2 ГБ. Ложится рядом с GGUF основной модели; планировщик — тот же, что у
+# Turbo (``TURBO_SCHEDULER``, ``shift_terminal: null``).
+TURBO4_REPO = "Abiray/Qwen-Image-2.1-viggle-4-steps-turbo-GGUF"
+TURBO4_FILE = "qwen_image_2.1_turbo_Q4_K_M.gguf"
+# Шарды bf16-энкодера: без них модель работает на собранном INT8-энкодере.
+TEXT_ENCODER_SHARDS = "text_encoder/*.safetensors"
+
+
+def gguf_file(variant: str) -> str:
+    """Имя файла варианта GGUF в репозитории Unsloth: ``Q4_K_M`` → ``qwen-image-2.1-Q4_K_M.gguf``."""
+    return f"qwen-image-2.1-{variant}.gguf"
+
+
+def turbo_files(light: bool) -> tuple[str, ...]:
+    return TURBO_FILES_LIGHT if light else TURBO_FILES
 
 
 class ModelDownloadError(RuntimeError):
     """Загрузка закончилась, а весов на месте всё равно нет."""
 
 
-def missing_files(model_dir: Path, include_transformer: bool = True) -> list[str]:
+def missing_files(model_dir: Path, include_transformer: bool = True, include_text_encoder: bool = True) -> list[str]:
     """Возвращает пути недостающих файлов относительно каталога модели.
 
     Пустой список означает, что модель на месте целиком. Файл нулевой длины
     считается отсутствующим: такой остаётся от оборванной записи и весами не
     является. ``include_transformer=False`` — шарды bf16-трансформера не
-    нужны (работа на INT8), их отсутствие не считается.
+    нужны (работа на INT8 или GGUF), их отсутствие не считается;
+    ``include_text_encoder=False`` — то же для шардов bf16-энкодера (собран
+    INT8-энкодер).
     """
     model_dir = Path(model_dir)
     if not _present(model_dir / MARKER):
@@ -78,6 +108,8 @@ def missing_files(model_dir: Path, include_transformer: bool = True) -> list[str
         folder = index_path.parent
         if not include_transformer and folder.name == "transformer":
             continue
+        if not include_text_encoder and folder.name == "text_encoder":
+            continue
         for shard in sorted(set(weight_map.values())):
             if not _present(folder / shard):
                 missing.append((folder / shard).relative_to(model_dir).as_posix())
@@ -91,8 +123,8 @@ def missing_files(model_dir: Path, include_transformer: bool = True) -> list[str
     return missing
 
 
-def is_complete(model_dir: Path, include_transformer: bool = True) -> bool:
-    return not missing_files(model_dir, include_transformer)
+def is_complete(model_dir: Path, include_transformer: bool = True, include_text_encoder: bool = True) -> bool:
+    return not missing_files(model_dir, include_transformer, include_text_encoder)
 
 
 def ensure_model(
@@ -100,6 +132,7 @@ def ensure_model(
     repo_id: str = REPO_ID,
     downloader: Callable[..., object] | None = None,
     include_transformer: bool = True,
+    include_text_encoder: bool = True,
 ) -> bool:
     """Доводит каталог весов до полного состава.
 
@@ -109,7 +142,7 @@ def ensure_model(
     генерацию, где он обойдётся дороже.
     """
     model_dir = Path(model_dir)
-    missing = missing_files(model_dir, include_transformer)
+    missing = missing_files(model_dir, include_transformer, include_text_encoder)
     if not missing:
         LOGGER.info("Weights found: %s", model_dir)
         return False
@@ -124,10 +157,12 @@ def ensure_model(
     )
     download = downloader or _snapshot_download
     model_dir.mkdir(parents=True, exist_ok=True)
-    ignore = [] if include_transformer else [TRANSFORMER_SHARDS]
+    ignore = ([] if include_transformer else [TRANSFORMER_SHARDS]) + (
+        [] if include_text_encoder else [TEXT_ENCODER_SHARDS]
+    )
     download(repo_id=repo_id, local_dir=model_dir, ignore=ignore)
 
-    still_missing = missing_files(model_dir, include_transformer)
+    still_missing = missing_files(model_dir, include_transformer, include_text_encoder)
     if still_missing:
         raise ModelDownloadError(
             "Weight download did not complete, missing "
@@ -162,7 +197,7 @@ def _snapshot_download(*, repo_id: str, local_dir: Path, ignore: list[str] | Non
     )
 
 
-# --- дополнительные веса: INT8-трансформер и адаптер turbo ---------------------
+# --- дополнительные веса: INT8- и GGUF-трансформер, адаптер turbo ----------------
 
 
 def missing_extra(directory: Path, files: tuple[str, ...]) -> list[str]:
@@ -203,8 +238,22 @@ def ensure_int8(directory: Path, downloader: Callable[..., object] | None = None
     return ensure_files(directory, INT8_REPO, (INT8_FILE,), downloader)
 
 
-def ensure_turbo(directory: Path, downloader: Callable[..., object] | None = None) -> bool:
-    return ensure_files(directory, TURBO_REPO, TURBO_FILES, downloader)
+def ensure_turbo(directory: Path, downloader: Callable[..., object] | None = None, light: bool = False) -> bool:
+    return ensure_files(directory, TURBO_REPO, turbo_files(light), downloader)
+
+
+def ensure_gguf(directory: Path, variant: str, downloader: Callable[..., object] | None = None) -> bool:
+    return ensure_files(directory, GGUF_REPO, (gguf_file(variant),), downloader)
+
+
+def turbo4_missing(gguf_dir: Path, turbo_dir: Path) -> list[str]:
+    return missing_extra(gguf_dir, (TURBO4_FILE,)) + missing_extra(turbo_dir, (TURBO_SCHEDULER,))
+
+
+def ensure_turbo4(gguf_dir: Path, turbo_dir: Path, downloader: Callable[..., object] | None = None) -> bool:
+    """Трансформер Turbo4 и конфигурация планировщика turbo. ``True`` — что-то качалось."""
+    fetched = ensure_files(gguf_dir, TURBO4_REPO, (TURBO4_FILE,), downloader)
+    return ensure_files(turbo_dir, TURBO_REPO, (TURBO_SCHEDULER,), downloader) or fetched
 
 
 def _file_download(*, repo_id: str, filename: str, local_dir: Path) -> object:

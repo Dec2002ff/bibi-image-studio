@@ -14,6 +14,11 @@
 Канонической копией весов считается копия на хосте, а не в модуле. Благодаря
 этому закрепление памяти делается один раз: возврат «на хост» — это возврат
 ссылки на уже закреплённый тензор, а не новое копирование.
+
+Это политика ``SWAP`` — для карт на 24 ГБ. Для карт на 6–12 ГБ есть
+``STREAM``: трансформер (GGUF) не покидает карту вовсе, а энкодер живёт на
+хосте и поднимается по блоку (``engine/streaming.py``). Политику выбирает
+профиль памяти (``settings.memory_profile``).
 """
 
 from __future__ import annotations
@@ -182,19 +187,93 @@ class StagedModule:
             LOGGER.exception("Failed to roll weights back to the host; the module is split across devices")
 
 
+class DeviceModule:
+    """Модуль, который живёт на устройстве и не покидает его.
+
+    Трансформер политики ``STREAM``: копия на хосте ему не нужна — он никуда
+    не переезжает, а на машине с 16–24 ГБ оперативной памяти четыре лишних
+    гигабайта закреплённой копии заметны. Интерфейс — как у ``StagedModule``,
+    чтобы менеджер не различал их там, где различать незачем.
+    """
+
+    def __init__(self, module: torch.nn.Module, device: str | torch.device) -> None:
+        self.module = module
+        self._device = torch.device(device)
+        self._nbytes = sum(_nbytes(tensor) for _name, tensor in _named_tensors(module))
+
+    @property
+    def resident(self) -> bool:
+        return True
+
+    @property
+    def nbytes(self) -> int:
+        return self._nbytes
+
+    def to_device(self) -> None:
+        # ``Module.to`` присваивает ``.data`` — для GGUFParameter (обычный
+        # подкласс, без внутренних тензоров) этого достаточно; уже лежащее на
+        # устройстве не копируется.
+        self.module.to(self._device)
+
+    def to_host(self) -> None:
+        """Ничего не делает: этот модуль с устройства не уходит."""
+
+
+SWAP = "swap"
+STREAM = "stream"
+POLICIES = (SWAP, STREAM)
+
+
 class ResidencyManager:
     """Владеет размещением трёх моделей пайплайна."""
 
-    def __init__(self, pipe, device: str | torch.device = "cuda", pin_memory: bool = True) -> None:
+    def __init__(
+        self,
+        pipe,
+        device: str | torch.device = "cuda",
+        pin_memory: bool = True,
+        policy: str = SWAP,
+    ) -> None:
+        if policy not in POLICIES:
+            raise ValueError(f"unknown residency policy: {policy!r}")
         self._pipe = pipe
         self._device = torch.device(device)
         self._pin_memory = pin_memory
-        self._transformer: StagedModule | None = None
-        self._text_encoder: StagedModule | None = None
+        self._policy = policy
+        self._transformer: StagedModule | DeviceModule | None = None
+        self._text_encoder = None
+        self._vae: StagedModule | None = None
         self._swaps = 0
+
+    @property
+    def policy(self) -> str:
+        return self._policy
 
     def start(self) -> None:
         """Раскладывает модели по местам. Вызывается один раз после загрузки."""
+        if self._policy == STREAM:
+            from . import streaming
+
+            self._transformer = DeviceModule(self._pipe.transformer, self._device)
+            encoder = self._pipe.text_encoder
+            self._text_encoder = streaming.StreamedModule(
+                encoder, streaming.text_encoder_blocks(encoder), self._device,
+                host_modules=streaming.text_encoder_host_modules(encoder),
+            )
+            # VAE на время кодирования уходит с карты (0.63 ГиБ — запас для
+            # энкодера по блоку), поэтому у него копия на хосте. Не закреплённая:
+            # переезд один на промах кэша, а закреплённая память на машине с
+            # 16–24 ГБ дороже десятых долей секунды.
+            self._vae = StagedModule(self._pipe.vae, self._device, pin_memory=False)
+            self._vae.to_device()
+            self._transformer.to_device()
+            LOGGER.info(
+                "Resident: transformer %.1f GiB, VAE on device; text encoder %.1f GiB streamed by block",
+                self._transformer.nbytes / 2**30,
+                self._text_encoder.nbytes / 2**30,
+            )
+            return
+
         LOGGER.info("Preparing host copies of weights (pinned: %s)", "yes" if self._pin_memory else "no")
         self._transformer = StagedModule(self._pipe.transformer, self._device, self._pin_memory)
         self._text_encoder = StagedModule(self._pipe.text_encoder, self._device, self._pin_memory)
@@ -228,7 +307,12 @@ class ResidencyManager:
         # эмбеддингов — пользователь же повторяет тот же промт, попадает в кэш,
         # сюда не заходит, и цикл денойзинга идёт по весам, лежащим на хосте.
         try:
-            self._transformer.to_host()
+            # При STREAM трансформер остаётся на месте: энкодеру по блоку
+            # хватает того, что трансформер оставил свободным.
+            if self._policy == SWAP:
+                self._transformer.to_host()
+            elif self._vae is not None:
+                self._vae.to_host()
             self._text_encoder.to_device()
             yield
         finally:
@@ -246,12 +330,65 @@ class ResidencyManager:
         """
         if self._transformer is None:
             raise RuntimeError("ResidencyManager.start() was not called")
+        if self._policy == STREAM:
+            # Копии на хосте нет, и снимать нечего: изменение делается прямо
+            # на устройстве (peft кладёт новые веса туда же, где лежит слой).
+            change(self._pipe.transformer)
+            self._transformer = DeviceModule(self._pipe.transformer, self._device)
+            self._transformer.to_device()
+            return
         self._transformer.to_host()
         try:
             change(self._pipe.transformer)
             self._transformer = StagedModule(self._pipe.transformer, self._device, self._pin_memory)
         finally:
             self._transformer.to_device()
+
+    def replace_transformer(
+        self,
+        load: Callable[[torch.device | None], torch.nn.Module],
+        parked: StagedModule | None = None,
+    ) -> StagedModule | None:
+        """Ставит на место трансформера другой. Возвращает отложенный прежний или ``None``.
+
+        Нужен пресетам на отдельном трансформере (Turbo4 — дистиллят, влитый
+        в веса). Прежний сначала освобождает видеопамять, и только потом
+        грузится новый: на 8 ГБ два трансформера по 4 ГБ вместе не помещаются.
+
+        * ``SWAP``: у прежнего уже есть копия на хосте — он откладывается туда
+          целиком и возвращается обратно без чтения с диска (``parked``).
+        * ``STREAM``: копии на хосте нет и держать её негде, прежний
+          отпускается; обратно он читается с диска через ``load``.
+
+        ``load(device)`` строит новый трансформер: при ``STREAM`` — прямо на
+        устройстве, при ``SWAP`` — на хосте (``device=None``).
+        """
+        import gc
+
+        if self._transformer is None:
+            raise RuntimeError("ResidencyManager.start() was not called")
+        kept: StagedModule | None = None
+        if self._policy == SWAP and isinstance(self._transformer, StagedModule):
+            self._transformer.to_host()
+            kept = self._transformer
+        self._transformer = None
+        self._pipe.transformer = None
+        gc.collect()
+        if self._device.type == "cuda":
+            torch.cuda.empty_cache()
+
+        if parked is not None:
+            parked.to_device()
+            self._transformer = parked
+        else:
+            module = load(self._device if self._policy == STREAM else None)
+            if self._policy == STREAM:
+                self._transformer = DeviceModule(module, self._device)
+            else:
+                self._transformer = StagedModule(module, self._device, self._pin_memory)
+            self._transformer.to_device()
+        self._pipe.transformer = self._transformer.module
+        return kept
 
     def restore(self) -> None:
         """Возвращает штатное размещение: трансформер на устройстве, энкодер на хосте.
@@ -275,6 +412,8 @@ class ResidencyManager:
         except BaseException:
             LOGGER.exception("Failed to offload the text encoder from the device")
         self._transformer.to_device()
+        if self._vae is not None:
+            self._vae.to_device()
 
     def stats(self) -> dict[str, float]:
         allocated = torch.cuda.memory_allocated(self._device) / 2**30 if self._device.type == "cuda" else 0.0

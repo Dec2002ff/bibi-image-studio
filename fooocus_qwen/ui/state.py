@@ -122,35 +122,64 @@ class Studio:
     def generator(self):
         """Возвращает генератор, загрузив модель при первом обращении.
 
-        Точность трансформера и механизм внимания берутся из настроек в
-        момент загрузки (``user/settings.json``): смена точности — это
-        перезагрузка модели (``switch_precision``), а механизм внимания
-        меняется на лету (``set_sage_attention``).
+        Точность трансформера, профиль памяти и механизм внимания берутся из
+        настроек в момент загрузки (``user/settings.json``): смена точности
+        или профиля — это перезагрузка модели (``switch_precision``,
+        ``switch_memory_profile``), а механизм внимания меняется на лету
+        (``set_sage_attention``).
+
+        Профиль «low» (карты на 6–16 ГБ) — трансформер не покидает карту, а
+        энкодер в INT8 подаётся по блоку. INT8-копия энкодера собирается
+        здесь же, если её ещё нет: около 20 секунд на видеокарте, один раз.
         """
         if self._generator is None:
             with self._lock:
                 if self._generator is None:
-                    from ..engine import fetch, loader
+                    from ..engine import fetch, loader, text_encoder
+                    from ..engine import residency as residency_module
                     from ..engine.generator import Generator
-                    from ..engine.turbo import TurboAdapter
+                    from ..engine.turbo import Turbo4Transformer, TurboAdapter
 
                     chosen = settings_module.load()
-                    int8_file = None
+                    low = self.memory_profile() == settings_module.MEMORY_LOW
+                    int8_file = gguf_file = te_dir = None
                     if chosen.precision == settings_module.PRECISION_INT8:
                         int8_file = config.INT8_DIR / fetch.INT8_FILE
+                    elif settings_module.is_gguf(chosen.precision):
+                        gguf_file = config.GGUF_DIR / fetch.gguf_file(chosen.precision)
+                    if low:
+                        te_dir = config.TE_INT8_DIR
+                        text_encoder.ensure(self.config.model_dir / "text_encoder", te_dir)
                     pipe, residency, cache = loader.load(
                         self.config.model_dir,
                         pin_memory=self.config.pin_memory,
                         int8_file=int8_file,
                         sage_attention=chosen.sage_attention,
+                        gguf_file=gguf_file,
+                        text_encoder_dir=te_dir,
+                        policy=residency_module.STREAM if low else residency_module.SWAP,
                     )
-                    turbo = TurboAdapter(pipe, residency, config.TURBO_DIR)
+                    turbo = TurboAdapter(pipe, residency, config.TURBO_DIR, light=low)
+                    policy = residency_module.STREAM if low else residency_module.SWAP
+                    turbo4 = Turbo4Transformer(
+                        pipe, residency, config.GGUF_DIR / fetch.TURBO4_FILE, config.TURBO_DIR,
+                        self.config.model_dir,
+                        base_loader=loader.base_transformer_loader(
+                            self.config.model_dir, int8_file=int8_file, gguf_file=gguf_file
+                        ),
+                        # Механизм внимания — по настройке на момент подмены:
+                        # его меняют на лету, и подменённый должен следовать.
+                        prepare=lambda module: loader.prepare_transformer(
+                            module, settings_module.load().sage_attention, policy, "cuda"
+                        ),
+                        turbo=turbo,
+                    )
                     # Полосы шагов diffusers в интерфейсе не нужны: ход
                     # генерации рисует свой обратный вызов, а
                     # ``gr.Progress(track_tqdm=True)`` (ради полосы скачивания
                     # весов) подхватил бы и их, перебивая подпись.
                     pipe.set_progress_bar_config(disable=True)
-                    self._generator = Generator(pipe, residency, cache, self.catalogue, turbo=turbo)
+                    self._generator = Generator(pipe, residency, cache, self.catalogue, turbo=turbo, turbo4=turbo4)
                     self._residency = residency
                     self._cache = cache
         return self._generator
@@ -164,22 +193,54 @@ class Studio:
         прямо перед генерацией, и строка прогресса говорит об этом —
         полосу скачивания рисует ``gr.Progress(track_tqdm=True)``.
         """
-        if not getattr(preset, "turbo", False) or self.turbo_weights_present():
+        from ..engine import presets
+
+        if getattr(preset, "transformer", "") == presets.TURBO4:
+            if self.turbo4_weights_present():
+                return None
+            message, fetch_weights = "turbo4_downloading", self.ensure_turbo4_weights
+        elif getattr(preset, "turbo", False) and not self.turbo_weights_present():
+            message, fetch_weights = "turbo_downloading", self.ensure_turbo_weights
+        else:
             return None
         if progress is not None:
-            progress(0, desc=say("turbo_downloading", lang))
+            progress(0, desc=say(message, lang))
         try:
-            self.ensure_turbo_weights()
+            fetch_weights()
         except Exception as error:  # noqa: BLE001 — сеть, диск, Hugging Face: всё это строка состояния
             LOGGER.exception("Turbo weights download failed")
             return say("turbo_download_failed", lang, error=_quote(error))
         return None
 
+    def memory_profile(self) -> str:
+        """Профиль памяти, в котором работает (или будет работать) модель: «high» или «low».
+
+        «auto» из настроек решается по объёму видеопамяти
+        (``settings.resolve_profile``).
+        """
+        from ..engine import hardware
+
+        return settings_module.resolve_profile(settings_module.load().memory_profile, hardware.vram_gib())
+
+    def _light_turbo(self) -> bool:
+        return self.memory_profile() == settings_module.MEMORY_LOW
+
     def ensure_turbo_weights(self) -> bool:
         """Докачивает веса turbo, если их нет. ``True`` — что-то качалось."""
         from ..engine import fetch
 
-        return fetch.ensure_turbo(config.TURBO_DIR)
+        return fetch.ensure_turbo(config.TURBO_DIR, light=self._light_turbo())
+
+    def turbo4_weights_present(self) -> bool:
+        from ..engine import fetch
+
+        return not fetch.turbo4_missing(config.GGUF_DIR, config.TURBO_DIR)
+
+    def ensure_turbo4_weights(self) -> bool:
+        """Докачивает трансформер Turbo4 (4.2 ГБ). ``True`` — что-то качалось."""
+        from ..engine import fetch
+
+        return fetch.ensure_turbo4(config.GGUF_DIR, config.TURBO_DIR)
 
     def pose_detector(self):
         """Распознавание позы на фото — одно на процесс: сессии ONNX дороги в создании."""
@@ -192,18 +253,21 @@ class Studio:
     def turbo_weights_present(self) -> bool:
         from ..engine import fetch
 
-        return not fetch.missing_extra(config.TURBO_DIR, fetch.TURBO_FILES)
+        return not fetch.missing_extra(config.TURBO_DIR, fetch.turbo_files(self._light_turbo()))
 
     def ensure_precision_weights(self, precision: str) -> bool:
         """Докачивает веса выбранной точности. ``True`` — что-то качалось.
 
-        Для INT8 это файл Unsloth; для bf16 — шарды bf16-трансформера,
-        которых нет у того, кто ставил приложение сразу в INT8.
+        Для INT8 это файл Unsloth; для GGUF — файл варианта (Unsloth); для
+        bf16 — шарды bf16-трансформера, которых нет у того, кто ставил
+        приложение сразу в INT8 или GGUF.
         """
         from ..engine import fetch
 
         if precision == settings_module.PRECISION_INT8:
             return fetch.ensure_int8(config.INT8_DIR)
+        if settings_module.is_gguf(precision):
+            return fetch.ensure_gguf(config.GGUF_DIR, precision)
         return fetch.ensure_model(self.config.model_dir, include_transformer=True)
 
     def switch_precision(self, precision: str) -> None:
@@ -214,6 +278,15 @@ class Studio:
         загрузиться обратно не смогла бы.
         """
         settings_module.update(precision=precision)
+        self.unload()
+
+    def switch_memory_profile(self, profile: str) -> None:
+        """Сохраняет профиль памяти и выгружает модель: следующая загрузка — в новом.
+
+        Профиль меняет раскладку целиком (кто живёт на карте, в каком виде
+        энкодер), на загруженной модели его не переключить.
+        """
+        settings_module.update(memory_profile=profile)
         self.unload()
 
     def unload(self) -> None:

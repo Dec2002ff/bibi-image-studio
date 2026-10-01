@@ -31,14 +31,39 @@ from . import layout
 from .i18n import MESSAGES, Localizer, pick, say, sentences
 from .state import GPU_CONCURRENCY_ID
 
+# Размеры GGUF — файлы Unsloth (ГиБ трансформера на карте). Варианты идут
+# от точного к компактному: чем ниже, тем меньше памяти и заметнее потеря.
+_GGUF_SIZES = {"Q8_0": 6.6, "Q6_K": 5.4, "Q5_K_M": 4.7, "Q4_K_M": 3.9, "Q4_K_S": 3.4, "Q3_K_M": 2.7}
+
 _PRECISION_CHOICES = {
     "ru": [
-        ("bf16 — исходная точность, 13.3 ГиБ видеопамяти", settings_module.PRECISION_BF16),
-        ("INT8 — 6.8 ГиБ, скорость почти та же", settings_module.PRECISION_INT8),
+        ("bf16 — исходная точность, 13.3 ГиБ видеопамяти (24 ГБ)", settings_module.PRECISION_BF16),
+        ("INT8 — 6.8 ГиБ, скорость почти та же (12–24 ГБ)", settings_module.PRECISION_INT8),
+        *[
+            (f"GGUF {name} — {size} ГиБ" + (" (рекомендуется для 6–8 ГБ)" if name == "Q4_K_M" else ""), name)
+            for name, size in _GGUF_SIZES.items()
+        ],
     ],
     "en": [
-        ("bf16 — original precision, 13.3 GiB of VRAM", settings_module.PRECISION_BF16),
-        ("INT8 — 6.8 GiB, nearly the same speed", settings_module.PRECISION_INT8),
+        ("bf16 — original precision, 13.3 GiB of VRAM (24 GB)", settings_module.PRECISION_BF16),
+        ("INT8 — 6.8 GiB, nearly the same speed (12–24 GB)", settings_module.PRECISION_INT8),
+        *[
+            (f"GGUF {name} — {size} GiB" + (" (recommended for 6–8 GB)" if name == "Q4_K_M" else ""), name)
+            for name, size in _GGUF_SIZES.items()
+        ],
+    ],
+}
+
+_PROFILE_CHOICES = {
+    "ru": [
+        ("Авто — по объёму видеопамяти", settings_module.MEMORY_AUTO),
+        ("High — 20 ГБ и больше: модели меняются на карте целиком", settings_module.MEMORY_HIGH),
+        ("Low — 6–16 ГБ: энкодер INT8 по слою, KV-кэш в ОЗУ", settings_module.MEMORY_LOW),
+    ],
+    "en": [
+        ("Auto — by the amount of VRAM", settings_module.MEMORY_AUTO),
+        ("High — 20 GB and more: models take turns on the card", settings_module.MEMORY_HIGH),
+        ("Low — 6–16 GB: INT8 encoder layer by layer, KV cache in RAM", settings_module.MEMORY_LOW),
     ],
 }
 
@@ -85,7 +110,10 @@ def describe_performance(studio, lang: str) -> str:
     else:
         attention_text = say("perf_attention_native", lang)
     turbo = say("perf_turbo_ready" if studio.turbo_weights_present() else "perf_turbo_later", lang)
-    return say("perf_current", lang, precision=chosen.precision.upper(), attention=attention_text, turbo=turbo)
+    return say(
+        "perf_current", lang, precision=chosen.precision.upper(), attention=attention_text, turbo=turbo,
+        profile=studio.memory_profile(),
+    )
 
 
 def _read_prompt(name: str, lang: str) -> str:
@@ -187,8 +215,9 @@ def build(studio, localizer: Localizer, language=None) -> dict:
             # отдельная кнопка, а не мгновенная реакция на выбор; внимание
             # переключается на лету.
             chosen = settings_module.load()
+            # Список, а не радиокнопки: вариантов восемь.
             precision = localizer.bind(
-                gr.Radio(
+                gr.Dropdown(
                     choices=_PRECISION_CHOICES[lang],
                     value=chosen.precision,
                     label=pick("perf_precision", lang),
@@ -198,6 +227,20 @@ def build(studio, localizer: Localizer, language=None) -> dict:
             )
             apply_precision_button = localizer.bind(
                 gr.Button(pick("perf_apply", lang)), value=("Применить точность", "Apply precision")
+            )
+            # Профиль памяти — раскладка весов (settings.MEMORY_PROFILES). Как
+            # и точность, меняется перезагрузкой модели, поэтому — кнопкой.
+            memory_profile = localizer.bind(
+                gr.Radio(
+                    choices=_PROFILE_CHOICES[lang],
+                    value=chosen.memory_profile,
+                    label=pick("perf_profile", lang),
+                ),
+                label=("Профиль памяти", "Memory profile"),
+                choices=(_PROFILE_CHOICES["ru"], _PROFILE_CHOICES["en"]),
+            )
+            apply_profile_button = localizer.bind(
+                gr.Button(pick("perf_profile_apply", lang)), value=("Применить профиль", "Apply profile")
             )
             sage = localizer.bind(
                 gr.Checkbox(
@@ -305,6 +348,16 @@ def build(studio, localizer: Localizer, language=None) -> dict:
             studio.preload_in_background()
         return sentences(say("precision_switched", lang, precision=choice.upper()), describe_performance(studio, lang))
 
+    def apply_memory_profile(choice, lang):
+        if choice not in settings_module.MEMORY_PROFILES:
+            return describe_performance(studio, lang)
+        if choice == settings_module.load().memory_profile:
+            return sentences(say("profile_unchanged", lang), describe_performance(studio, lang))
+        studio.switch_memory_profile(choice)
+        if studio.config.preload:
+            studio.preload_in_background()
+        return sentences(say("profile_switched", lang, profile=choice), describe_performance(studio, lang))
+
     def toggle_sage(enabled, lang):
         studio.set_sage_attention(bool(enabled))
         return describe_performance(studio, lang)
@@ -314,6 +367,9 @@ def build(studio, localizer: Localizer, language=None) -> dict:
     # дождётся, но очередь не выпустит генерацию навстречу перезагрузке).
     apply_precision_button.click(
         apply_precision, [precision, language], performance_status, concurrency_id=GPU_CONCURRENCY_ID
+    )
+    apply_profile_button.click(
+        apply_memory_profile, [memory_profile, language], performance_status, concurrency_id=GPU_CONCURRENCY_ID
     )
     # input, а не change: change срабатывает и от программного обновления при
     # открытии вкладки, и каждое открытие «переключало» бы внимание.
@@ -340,6 +396,7 @@ def build(studio, localizer: Localizer, language=None) -> dict:
             chosen.precision,
             gr.update(value=chosen.sage_attention, interactive=attention.sage_available()),
             describe_performance(studio, lang),
+            chosen.memory_profile,
         )
 
     return {
@@ -350,5 +407,6 @@ def build(studio, localizer: Localizer, language=None) -> dict:
         "precision": precision,
         "sage": sage,
         "performance_status": performance_status,
+        "memory_profile": memory_profile,
         "refresh": refresh,
     }

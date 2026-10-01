@@ -3,18 +3,21 @@
 Два вопроса, оба с разумным ответом по умолчанию, и оба можно поменять
 потом во вкладке «Настройки»:
 
-* **точность трансформера** — bf16 (исходные веса, 13.3 ГиБ видеопамяти)
-  или INT8 (веса Unsloth, 6.8 ГиБ, скорость почти та же). От ответа
-  зависит, что качает следующий шаг установки: при INT8 bf16-шарды
-  трансформера (14 ГБ) не нужны вовсе;
+* **точность трансформера** — bf16 (исходные веса, 13.3 ГиБ видеопамяти),
+  INT8 (веса Unsloth, 6.8 ГиБ, скорость почти та же) или вариант GGUF
+  (Unsloth, от 6.6 ГиБ у Q8_0 до 2.7 у Q3_K_M; Q4_K_M — для 6–8 ГБ). От
+  ответа зависит, что качает следующий шаг установки: при INT8 и GGUF
+  bf16-шарды трансформера (14 ГБ) не нужны вовсе. По умолчанию предлагается
+  то, что подходит к найденной видеокарте (``settings.recommended_precision``);
+  профиль памяти не спрашивается — «auto» решает его по той же карте, а
+  поменять можно во вкладке «Настройки»;
 * **SageAttention** — внимание на −15…25 % быстрее. Пакет необязательный и
   ставится отдельно: под Windows — готовая сборка
   (github.com/woct0rdho/SageAttention) плюс ``triton-windows`` той версии,
   что совместима с установленным torch.
 
 Отказ отвечать — полноправный ответ: остаётся текущий выбор, а если его
-не было — bf16 без SageAttention, то есть поведение до появления этих
-настроек.
+не было — точность, рекомендованная для этой карты, без SageAttention.
 """
 
 from __future__ import annotations
@@ -44,20 +47,39 @@ def configure(
     out: Callable[..., None] = print,
     install_sage: Callable[[Callable[..., None]], bool] | None = None,
     sage_available: Callable[[], bool] | None = None,
+    vram_gib: float | None | object = ...,
 ) -> settings_module.Settings:
-    """Задаёт оба вопроса, сохраняет ответы и возвращает итоговые настройки."""
+    """Задаёт оба вопроса, сохраняет ответы и возвращает итоговые настройки.
+
+    ``vram_gib`` — объём видеопамяти; по умолчанию определяется
+    (``engine/hardware.py``), тесты подставляют свой.
+    """
     ask = _forgiving(ask)
     install_sage = install_sage or install_sage_attention
     sage_available = sage_available or _sage_importable
-    current = settings_module.load(path)
+    if vram_gib is ...:
+        from . import hardware
 
+        vram_gib = hardware.vram_gib()
+    settings_path = path or settings_module.config.SETTINGS_FILE
+    current = settings_module.load(path)
+    recommended = settings_module.recommended_precision(vram_gib)
+    known = current.precision if settings_path.is_file() else recommended
+
+    card = f"{vram_gib:.1f} GiB" if vram_gib is not None else "no CUDA device"
+    profile = settings_module.resolve_profile(current.memory_profile, vram_gib)
+    out(f"  Video card: {card}; memory profile: {profile} (change it on the Settings tab)")
     out("  Transformer weight precision:")
-    out("    1 - bf16: original precision, 13.3 GiB VRAM, ~33 GB of weights")
-    out("    2 - INT8: 6.8 GiB VRAM, nearly the same speed, ~26 GB of weights")
-    default = "2" if current.precision == settings_module.PRECISION_INT8 else "1"
+    options = list(settings_module.PRECISIONS)
+    for number, name in enumerate(options, start=1):
+        mark = "  <- recommended for this card" if name == recommended else ""
+        out(f"    {number} - {_PRECISION_TEXT[name]}{mark}")
+    default = str(options.index(known) + 1)
     answer = ask(f"  Choice (Enter = {default}): ").strip() or default
-    precision = settings_module.PRECISION_INT8 if answer == "2" else settings_module.PRECISION_BF16
-    if answer not in ("1", "2"):
+    if answer.isdigit() and 1 <= int(answer) <= len(options):
+        precision = options[int(answer) - 1]
+    else:
+        precision = known
         out(f"  Did not understand '{answer}', keeping {precision}")
 
     out("  SageAttention speeds up generation by 15-25%; the package is installed separately.")
@@ -68,10 +90,24 @@ def configure(
     if wants_sage and not sage_available():
         wants_sage = install_sage(out)
 
-    chosen = settings_module.Settings(precision=precision, sage_attention=wants_sage)
+    chosen = settings_module.Settings(
+        precision=precision, sage_attention=wants_sage, memory_profile=current.memory_profile
+    )
     settings_module.save(chosen, path)
     out(f"  Saved: precision {precision}, SageAttention {'enabled' if wants_sage else 'disabled'}")
     return chosen
+
+
+_PRECISION_TEXT = {
+    "bf16": "bf16: original precision, 13.3 GiB VRAM, ~33 GB of weights (24 GB cards)",
+    "int8": "INT8: 6.8 GiB VRAM, nearly the same speed, ~26 GB of weights (12-24 GB cards)",
+    "Q8_0": "GGUF Q8_0: 6.6 GiB VRAM, closest to bf16 (10-16 GB cards)",
+    "Q6_K": "GGUF Q6_K: 5.4 GiB VRAM (10-12 GB cards)",
+    "Q5_K_M": "GGUF Q5_K_M: 4.7 GiB VRAM (8-10 GB cards, tight on 8)",
+    "Q4_K_M": "GGUF Q4_K_M: 3.9 GiB VRAM, the choice for 6-8 GB cards",
+    "Q4_K_S": "GGUF Q4_K_S: 3.4 GiB VRAM, fallback if Q4_K_M runs out of memory",
+    "Q3_K_M": "GGUF Q3_K_M: 2.7 GiB VRAM, visible quality loss; last resort",
+}
 
 
 def install_sage_attention(out: Callable[..., None] = print, python: str | None = None) -> bool:

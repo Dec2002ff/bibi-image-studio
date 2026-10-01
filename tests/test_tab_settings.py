@@ -177,7 +177,7 @@ def test_opening_the_tab_rereads_the_address(monkeypatch, tmp_path):
     assert components["address"].value == ""
 
     _configure(tmp_path, "192.0.2.10:8000\ntoken=" + SECRET + "\n")
-    address, status, _memory, _precision, _sage, _performance = components["refresh"]("ru")
+    address, status, _memory, _precision, _sage, _performance, _profile = components["refresh"]("ru")
     assert "192.0.2.10:8000" in address
     assert "192.0.2.10:8000" in status and SECRET not in status and SECRET not in address
 

@@ -11,10 +11,13 @@
     2. The other dependencies from requirements.txt.
     3. torch is pinned once more: third-party packages can replace the CUDA
        build with a plain one.
-    4. Performance: weight precision (bf16 or INT8) and SageAttention. The
-       answer decides what the next step downloads.
-    5. Model weights (about 33 GB for bf16, 26 GB for INT8) and the pose
-       recognition weights (DWPose, 350 MB); only missing files are downloaded.
+    4. Performance: weight precision (bf16, INT8 or a GGUF variant; the
+       default fits the detected video card, Q4_K_M on 6-8 GB) and
+       SageAttention. The answer decides what the next step downloads.
+    5. Model weights (about 33 GB for bf16, 26 GB for INT8, 23 GB for GGUF)
+       and the pose recognition weights (DWPose, 350 MB); only missing files
+       are downloaded. On cards under 20 GB the INT8 text encoder is built
+       here as well (about 20 s).
     6. The language model address for prompt AI boost (optional).
     7. Self-test: "installed" must mean "will start".
 

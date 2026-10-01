@@ -85,4 +85,4 @@ def test_the_loader_actually_calls_it():
     import inspect
 
     source = inspect.getsource(loader.load)
-    assert "_configure_vae_tiling(pipe)" in source
+    assert "_configure_vae_tiling(pipe," in source

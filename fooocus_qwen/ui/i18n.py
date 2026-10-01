@@ -173,6 +173,8 @@ T: dict[str, tuple[str, str]] = {
     "perf_precision": ("Точность трансформера", "Transformer precision"),
     "perf_apply": ("Применить точность", "Apply precision"),
     "perf_sage": ("SageAttention — быстрое внимание", "SageAttention — fast attention"),
+    "perf_profile": ("Профиль памяти", "Memory profile"),
+    "perf_profile_apply": ("Применить профиль", "Apply profile"),
     "gallery_reuse": ("Повторить параметры", "Reuse parameters"),
     "gallery_to_editor": ("Открыть в редакторе", "Open in editor"),
     "gallery_from_file": ("Параметры из PNG-файла…", "Parameters from a PNG file…"),
@@ -437,8 +439,13 @@ MESSAGES: dict[str, tuple[str, str]] = {
     "boost_failed": ("AI буст не выполнен: {error}", "AI boost failed: {error}"),
     "boost_done": ("AI буст выполнен", "AI boost done"),
     "perf_current": (
-        "Точность: {precision}. Внимание: {attention}. Turbo: {turbo}.",
-        "Precision: {precision}. Attention: {attention}. Turbo: {turbo}.",
+        "Точность: {precision}. Профиль памяти: {profile}. Внимание: {attention}. Turbo: {turbo}.",
+        "Precision: {precision}. Memory profile: {profile}. Attention: {attention}. Turbo: {turbo}.",
+    ),
+    "profile_unchanged": ("Этот профиль уже выбран.", "This profile is already selected."),
+    "profile_switched": (
+        "Профиль памяти: {profile}; модель перезагружается в фоне.",
+        "Memory profile set to {profile}; the model reloads in the background.",
     ),
     "perf_attention_native": ("штатное", "standard"),
     "perf_attention_missing": (
@@ -458,8 +465,12 @@ MESSAGES: dict[str, tuple[str, str]] = {
         "Precision set to {precision}; the model reloads in the background.",
     ),
     "turbo_downloading": (
-        "Скачиваю веса Turbo (1.3 ГБ) — один раз…",
-        "Downloading the Turbo weights (1.3 GB) — once…",
+        "Скачиваю веса Turbo (0.6–1.3 ГБ) — один раз…",
+        "Downloading the Turbo weights (0.6–1.3 GB) — once…",
+    ),
+    "turbo4_downloading": (
+        "Скачиваю трансформер Turbo4 (4.2 ГБ) — один раз…",
+        "Downloading the Turbo4 transformer (4.2 GB) — once…",
     ),
     "turbo_download_failed": (
         "Веса Turbo не скачались: {error}. Проверьте сеть и повторите — докачается только недостающее.",

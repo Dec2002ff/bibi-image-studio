@@ -19,6 +19,11 @@ MODEL_DIR = PROJECT_ROOT / "Qwen-Image-2.1"
 # дистиллята turbo (6 шагов вместо 16–40, 1.3 ГБ). Качаются по требованию.
 INT8_DIR = PROJECT_ROOT / "Qwen-Image-2.1-INT8"
 TURBO_DIR = PROJECT_ROOT / "Qwen-Image-2.1-turbo"
+# Для карт на 6–12 ГБ: трансформер в GGUF (Unsloth, 3–7 ГБ по варианту) и
+# текстовый энкодер, сжатый в int8 из bf16-весов основной модели (8.4 ГБ;
+# собирается установкой, не качается).
+GGUF_DIR = PROJECT_ROOT / "Qwen-Image-2.1-GGUF"
+TE_INT8_DIR = PROJECT_ROOT / "Qwen-Image-2.1-TE-INT8"
 # Распознавание позы на фотографии (DWPose, ONNX, 350 МБ) — для плитки
 # «Добавить позу»; качает установка (--fetch-model).
 DWPOSE_DIR = PROJECT_ROOT / "DWPose"
@@ -39,7 +44,7 @@ LOG_DIR = PROJECT_ROOT / "logs"
 ENDPOINT_FILE = PROJECT_ROOT / "llm_endpoint.txt"
 SETTINGS_FILE = USER_DIR / "settings.json"
 
-PRESET_NAMES = ("LowQuality", "MiddleQuality", "MaxQuality", "Turbo", "TurboDraft")
+PRESET_NAMES = ("LowQuality", "MiddleQuality", "MaxQuality", "Turbo", "TurboDraft", "Turbo4")
 
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 7865

@@ -6,8 +6,8 @@ from fooocus_qwen.engine import presets
 
 
 def test_quality_presets_ascend_and_turbo_comes_last():
-    assert presets.NAMES == ("LowQuality", "MiddleQuality", "MaxQuality", "Turbo", "TurboDraft")
-    full = [name for name in presets.NAMES if not presets.get(name).turbo]
+    assert presets.NAMES == ("LowQuality", "MiddleQuality", "MaxQuality", "Turbo", "TurboDraft", "Turbo4")
+    full = [name for name in presets.NAMES if not presets.get(name).turbo and not presets.get(name).transformer]
     resolutions = [presets.get(name).output_resolution for name in full]
     steps = [presets.get(name).num_inference_steps for name in full]
     assert resolutions == sorted(resolutions)
@@ -56,3 +56,16 @@ def test_the_command_line_offers_every_preset():
     from fooocus_qwen import config
 
     assert config.PRESET_NAMES == presets.NAMES
+
+
+def test_turbo4_is_four_uniform_steps_on_its_own_transformer():
+    """Turbo4 — отдельный трансформер (не адаптер) и четыре равномерных узла."""
+    from fooocus_qwen.engine import turbo
+
+    preset = presets.get("Turbo4")
+    assert preset.transformer == presets.TURBO4 and not preset.turbo
+    assert preset.num_inference_steps == len(turbo.SIGMAS4) == 4
+    assert preset.output_resolution == 1024
+    arguments = turbo.call_arguments4({"num_inference_steps": 16, "true_cfg_scale": 4.0, "negative_prompt": "x"})
+    assert arguments["sigmas"] == [1.0, 0.75, 0.5, 0.25]
+    assert arguments["true_cfg_scale"] == 1.0 and arguments["negative_prompt"] is None

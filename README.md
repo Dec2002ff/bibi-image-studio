@@ -131,8 +131,8 @@ Double-click a thumbnail to view it full size.
 ### Settings
 
 This tab holds the language model address, the system prompts used by AI boost,
-the **performance** choices (transformer precision and SageAttention) and a GPU
-memory report. The access token is write-only: the page never shows it.
+the **performance** choices (transformer precision, memory profile and
+SageAttention) and a GPU memory report. The access token is write-only: the page never shows it.
 
 ![Settings tab](docs/images/settings.webp)
 
@@ -140,9 +140,9 @@ memory report. The access token is write-only: the page never shows it.
 
 | | Minimum | Tested on |
 |---|---|---|
-| GPU | NVIDIA, 24 GB VRAM | RTX 3090, 24 GB |
-| RAM | 64 GB | 128 GB |
-| Disk | ~35 GB for the model weights | |
+| GPU | NVIDIA, 24 GB VRAM — "high" profile; **8 GB** — "low" profile with GGUF | RTX 3090, 24 GB; RTX 4060 Laptop, 8 GB |
+| RAM | 64 GB for "high"; 16–24 GB for "low" | 128 GB; 24 GB |
+| Disk | ~35 GB for the model weights (+13 GB for "low") | |
 | OS | Windows 11; Linux via `install.sh` / `run.sh` (not tested on this build) | Windows 11 |
 | Python | 3.12 (3.13 works) | 3.12 |
 
@@ -150,7 +150,8 @@ The large RAM requirement is deliberate. A pinned copy of the text encoder
 lives in RAM, so the diffusion transformer can stay resident on the GPU. The
 weights then don't cross the PCIe bus on every generation (see
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), section 3). If RAM is short, run
-with `--no-pin-memory`.
+with `--no-pin-memory`. Cards under 20 GB get the "low" profile automatically —
+see [Cards with 6–16 GB](#cards-with-616-gb).
 
 ## Installation
 
@@ -174,16 +175,20 @@ The installer:
 2. installs `torch`/`torchvision` from the PyTorch CUDA index, then the rest of `requirements.txt`;
 3. checks that `torch` really is a CUDA build — some packages quietly swap it for a CPU one;
 4. **asks about performance**: transformer precision — bf16 (original, 13.3 GiB
-   of VRAM) or INT8 (6.8 GiB, nearly the same speed) — and whether to install
+   of VRAM), INT8 (6.8 GiB, nearly the same speed) or a GGUF variant (Q8_0 …
+   Q3_K_M; Q4_K_M is 3.9 GiB, for 6–8 GB cards) — and whether to install
    SageAttention (15–25% faster; on Windows a prebuilt wheel plus
-   `triton-windows` matching your torch). Press Enter to keep bf16 without
-   SageAttention;
+   `triton-windows` matching your torch). Press Enter for the precision that
+   fits the detected card (bf16 on 24 GB, Q4_K_M on 8 GB);
 5. **downloads the model weights** (`Qwen/Qwen-Image-2.1`) into `Qwen-Image-2.1/`:
    ~33 GB for bf16; for INT8 the bf16 transformer shards are skipped and the
    INT8 transformer (7.3 GB, `unsloth/Qwen-Image-2.1-FP8`) goes to
    `Qwen-Image-2.1-INT8/`, ~26 GB in total. It checks the files listed in the
    model's index, resumes an interrupted download and skips what is already
-   there. The pose recognition weights (DWPose, 350 MB) go to `DWPose/` in the
+   there. For GGUF the variant file (`unsloth/Qwen-Image-2.1-GGUF`) goes to
+   `Qwen-Image-2.1-GGUF/`. On cards under 20 GB the INT8 copy of the text
+   encoder is built here once (`Qwen-Image-2.1-TE-INT8/`, 8.4 GiB, about
+   20 s). The pose recognition weights (DWPose, 350 MB) go to `DWPose/` in the
    same step;
 6. **asks for the language model address and token** for AI boost and tests
    the connection. Press Enter to skip: everything except AI boost and
@@ -238,6 +243,7 @@ The full guide is in Russian: [docs/USAGE.md](docs/USAGE.md). The essentials fol
 | MaxQuality | 2048 px | 40 | ~283 s |
 | **Turbo** | 1024 px | 6 | ~11 s |
 | **TurboDraft** | 768 px | 6 | ~5 s |
+| **Turbo4** | 1024 px | 4 | 19.3 s on an RTX 4060 Laptop (Turbo there: 28.7 s) |
 
 **Turbo** uses [Qwen-Image-2.1-viggle-turbo](https://huggingface.co/Viggle/Qwen-Image-2.1-viggle-turbo),
 a distilled LoRA for this model: 6 steps without CFG instead of 16–40, for
@@ -254,6 +260,16 @@ at full size. Use it to try prompts and seeds, then repeat the one you like
 on Turbo or MiddleQuality with the same seed. (Suggested by a Reddit
 commenter; 896 px was measured too and barely helps: 8.3 s.)
 
+**Turbo4** is Viggle's 4-step distillate (preview v0.1) merged into the
+transformer and quantized to GGUF Q4_K_M
+([Abiray](https://huggingface.co/Abiray/Qwen-Image-2.1-viggle-4-steps-turbo-GGUF)).
+The fastest preset: 19.3 s a frame on an RTX 4060 Laptop against 28.7 s for
+Turbo. Rendered text holds up as well as Turbo, the look is more contrasty;
+**editing is weaker** — the frame drifts from the source, so use Turbo for
+edits. It is a separate transformer (4.2 GB, downloaded on first use), so
+switching to Turbo4 and back swaps the transformer: about 4 s on 8 GB; on
+24 GB the main one waits in RAM.
+
 ### Speed and memory: precision and SageAttention
 
 On the Settings tab, under *Transformer precision*:
@@ -265,6 +281,10 @@ On the Settings tab, under *Transformer precision*:
   phase — where references run out of it — and for other programs; while a
   new prompt is encoded the text encoder (16.3 GiB) is on the card in both
   modes, so that brief peak does not change.
+
+- **GGUF Q8_0 … Q3_K_M** — [Unsloth's GGUF weights](https://huggingface.co/unsloth/Qwen-Image-2.1-GGUF),
+  6.6 down to 2.7 GiB; Q4_K_M (3.9 GiB) is the choice for 6–8 GB cards,
+  Q4_K_S a fallback if memory runs out, Q3_K_M a last resort with visible loss.
 
 *Apply precision* downloads the missing weights (with a progress bar) and
 reloads the model. **SageAttention** switches on the fly; the checkbox is
@@ -377,6 +397,25 @@ back to the text alone and says so. Rewritten descriptions are in English
 unless the instruction is in Chinese. Text you want drawn in the image — in
 double quotes — keeps its own language.
 
+### Cards with 6–16 GB
+
+This is an **extension**: on 20 GB cards and up nothing changes. The *Memory
+profile* on the Settings tab:
+
+- **Auto** (default) — "high" from 20 GiB of VRAM, "low" below;
+- **High** — the transformer and the bf16 text encoder take turns on the card (24 GB);
+- **Low** — the transformer stays on the card; the text encoder (compressed to
+  INT8, as accurate as bf16) is lifted onto the card one layer at a time; the
+  large KV cache of edits and references lives in RAM; smaller VAE tiles.
+  Turbo uses the same distillate with a lighter adapter (0.63 GB).
+
+For 8 GB use GGUF Q4_K_M with *Auto*. Start with LowQuality (1024 px) or
+Turbo; MiddleQuality (1536 px) works but takes about four minutes a frame.
+Close programs that hold VRAM (a browser with hardware acceleration, games).
+If memory runs out — Q4_K_S, then fewer references. Analysis and
+measurements: [docs/research/2026-10-02-8-gb.md](docs/research/2026-10-02-8-gb.md)
+(in Russian).
+
 ## Performance
 
 Measured on an RTX 3090 (24 GB); median of steady-state runs:
@@ -397,6 +436,21 @@ peak while the text encoder runs. The details are in [docs/research/2026-09-24-u
 
 The compute is close to the card's limit: 53.8 of 71.5 TFLOPS. Full numbers
 and methodology: [docs/BENCHMARK.md](docs/BENCHMARK.md).
+
+RTX 4060 Laptop (8 GB), GGUF Q4_K_M + SageAttention, "low" profile:
+
+| | Time | Peak VRAM |
+|---|---|---|
+| LowQuality, 1024 px | 66.5 s | 5.5 GiB |
+| 1024 px, 25 steps | 97.1 s | 5.6 GiB |
+| Turbo, 1024 px | 31.9 s | 6.2 GiB |
+| TurboDraft, 768 px | 18.8 s | 6.2 GiB |
+| Edit, 1024 px | 77.6 s | 6.4 GiB |
+| Two references | 79.6 s | 6.5 GiB |
+| MiddleQuality, 1536 px | 215.4 s | 6.5 GiB |
+| Model load | 8 s | |
+
+Times include encoding a new prompt; repeating the same prompt is 2–4 s shorter.
 
 ## Privacy and security
 

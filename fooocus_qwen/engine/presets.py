@@ -22,6 +22,13 @@ class QualityPreset:
     # узлы и планировщик. ``num_inference_steps`` у такого пресета — это те
     # же шесть шагов, для прогресса и метаданных.
     turbo: bool = False
+    # Отдельный трансформер вместо основного (``TURBO4`` — 4-шаговый
+    # дистиллят, влитый в веса, ``engine/turbo.py::Turbo4Transformer``).
+    # Пустая строка — основной.
+    transformer: str = ""
+
+
+TURBO4 = "turbo4"
 
 
 PRESETS: dict[str, QualityPreset] = {
@@ -43,9 +50,15 @@ PRESETS: dict[str, QualityPreset] = {
     # чисто (tools/experiments/lora_overhead.py, совет из сообщества). 896²
     # почти ничего не даёт — 8.3 с, поэтому именно 768.
     "TurboDraft": QualityPreset("TurboDraft", output_resolution=768, num_inference_steps=6, turbo=True),
+    # 4-шаговый дистиллят Viggle (v0.1) от Abiray, GGUF Q4_K_M, отдельный
+    # трансформер: 19.3 с на кадр 1024² на RTX 4060 Laptop против 28.7 у
+    # Turbo. Надписи держит, правку — хуже Turbo: кадр уходит от исходника
+    # (tools/experiments/lowvram_turbo4.py). Первый выбор и возврат с него —
+    # подмена трансформера, на 8 ГБ — несколько секунд чтения с диска.
+    "Turbo4": QualityPreset("Turbo4", output_resolution=1024, num_inference_steps=4, transformer=TURBO4),
 }
 
-NAMES: tuple[str, ...] = ("LowQuality", "MiddleQuality", "MaxQuality", "Turbo", "TurboDraft")
+NAMES: tuple[str, ...] = ("LowQuality", "MiddleQuality", "MaxQuality", "Turbo", "TurboDraft", "Turbo4")
 DEFAULT = "MiddleQuality"
 
 
