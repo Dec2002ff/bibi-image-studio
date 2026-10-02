@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "profiles": [
+    {
+      "id": "example-character",
+      "name": "示例角色",
+      "description": "仅展示 Character Profile 格式；不会自动用于生成。",
+      "reference_images": [
+        "front.png",
+        "three-quarter.png",
+        "side.png",
+        "full-body.png"
+      ],
+      "identity_strength": 0.85,
+      "default_style_profile": null,
+      "notes": "",
+      "tags": [
+        "example"
+      ]
+    }
+  ]
+}
