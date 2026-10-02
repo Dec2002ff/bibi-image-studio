@@ -6,12 +6,12 @@ on:
   pull_request:
     paths:
       - "fooocus_qwen/bibi/**"
-      - "tests/test_bibi_profiles.py"
+      - "tests/test_bibi_*.py"
       - "config/**"
       - ".github/workflows/bibi-foundation.yml"
 
 jobs:
-  profiles:
+  product-layer:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,5 +22,5 @@ jobs:
         run: python -m pip install --upgrade pytest
       - name: Compile product layer
         run: python -m compileall -q fooocus_qwen/bibi
-      - name: Test profile contracts
-        run: pytest -q tests/test_bibi_profiles.py
+      - name: Test Bibi product contracts
+        run: pytest -q tests/test_bibi_profiles.py tests/test_bibi_product_layer.py
