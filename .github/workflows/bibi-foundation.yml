@@ -1,0 +1,26 @@
+name: Bibi foundation checks
+
+on:
+  push:
+    branches: [bibi-foundation]
+  pull_request:
+    paths:
+      - "fooocus_qwen/bibi/**"
+      - "tests/test_bibi_profiles.py"
+      - "config/**"
+      - ".github/workflows/bibi-foundation.yml"
+
+jobs:
+  profiles:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install lightweight test dependency
+        run: python -m pip install --upgrade pytest
+      - name: Compile product layer
+        run: python -m compileall -q fooocus_qwen/bibi
+      - name: Test profile contracts
+        run: pytest -q tests/test_bibi_profiles.py
