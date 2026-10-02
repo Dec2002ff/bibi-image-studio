@@ -24,8 +24,9 @@ from ..prompting import boost as boost_module
 from ..prompting import library
 from ..storage import gallery
 from . import layout, reference_tools
+from . import quality as quality_choices
 from . import references as references_module
-from .i18n import Localizer, pick, say, sentences
+from .i18n import Localizer, T, pick, say, sentences
 from .references import (  # noqa: F401 — имена сетки остаются доступны как tab_generate.*
     _NO_TAG,
     MAX_REFERENCES,
@@ -208,13 +209,17 @@ def build(studio, localizer: Localizer, language=None) -> dict:
             )
 
         with gr.Column(min_width=layout.SIDE_MIN_WIDTH, elem_classes=[layout.SIDE_COL]):
+            # Столбцом и словами: в строку шесть имён пресетов переносились
+            # как попало и ничего не говорили о том, что выбор даёт.
             quality = localizer.bind(
                 gr.Radio(
-                    choices=list(presets.NAMES),
+                    choices=quality_choices.choices(lang),
                     value=studio.config.preset,
                     label=pick("quality", lang),
+                    elem_classes=[layout.CHOICES],
                 ),
-                label=("Качество", "Quality"),
+                label=T["quality"],
+                choices=(quality_choices.choices("ru"), quality_choices.choices("en")),
             )
             ratio = localizer.bind(
                 gr.Dropdown(

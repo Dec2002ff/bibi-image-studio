@@ -7,7 +7,8 @@ A [Fooocus](https://github.com/lllyasviel/Fooocus)-style studio for the local
 line, one **Generate** button, and everything else behind **Advanced**. It
 generates images from text, edits them by instruction — with a mask brush,
 colour annotations or an exact region — extends the canvas, and takes up to ten
-reference images. Everything runs on your own GPU.
+reference images. Everything runs on your own GPU — from a 24 GB desktop card
+down to an 8 GB laptop.
 
 ![Images generated with Fooocus-Qwen-Image-2.1](docs/images/showcase.webp)
 
@@ -18,6 +19,7 @@ reference images. Everything runs on your own GPU.
 - [Features](#features)
 - [A tour of the interface](#a-tour-of-the-interface)
 - [Requirements](#requirements)
+- [Which settings for my card](#which-settings-for-my-card)
 - [Installation](#installation)
 - [Running](#running)
 - [Usage guide](#usage-guide)
@@ -30,14 +32,16 @@ reference images. Everything runs on your own GPU.
 
 ## Features
 
-- **Text to image** at three quality presets plus **Turbo** (a 6-step distilled
-  model at 1 MP, about 2× faster than LowQuality) and **TurboDraft** (the same
-  at 768 px, ~5 s, for trying prompts and seeds), in seven aspect ratios, with 277 Fooocus styles and up
-  to eight images per run.
-- **Choose speed and memory**: bf16 or INT8 transformer weights (13.3 vs 6.8 GiB
-  of VRAM, nearly the same speed) and optional SageAttention (15–25% faster
-  steps). Pick them during installation or switch later in Settings; missing
-  weights download with a progress bar.
+- **Text to image** with six quality choices, from a 5-second draft to 2K:
+  the full model at 16, 28 or 40 steps, and the distilled **Turbo** (6 steps
+  at 1 MP), **Draft** (the same at 768 px) and **Turbo4** (4 steps, the
+  fastest on 8 GB cards). Seven aspect ratios, 277 Fooocus styles, up to eight
+  images per run.
+- **Runs on 8 to 24 GB cards**: the transformer in bf16, INT8 or GGUF (13.3
+  down to 2.7 GiB of VRAM), a memory profile picked by the card, and optional
+  SageAttention (15–25% faster steps). The installer proposes what fits your
+  card; switch later in Settings, where every option states what it costs.
+  Missing weights download with a progress bar.
 - **Reference images**: up to ten, each addressed in the prompt as
   `<image1>`…`<image10>`. Any cell can take a **pose** — from a pose library
   or recognised from your own photo — or a hand-drawn **sketch**.
@@ -57,15 +61,18 @@ reference images. Everything runs on your own GPU.
 - **Gallery** with each image's parameters stored inside the PNG: reuse them,
   send the image back to the editor, or restore parameters from any PNG file.
 - **Bilingual interface** (English / Russian), switchable at any time.
-- **Built for a single 24 GB card**: model weights move between GPU and RAM
-  automatically, prompt embeddings are cached and the VAE decodes in tiles
-  without seams.
+- **Careful with video memory**: on 24 GB the models take turns on the card
+  whole; on 8 GB the transformer stays put while the text encoder, compressed
+  to INT8, is lifted onto the card one layer at a time. Prompt embeddings are
+  cached and the VAE decodes in tiles without seams.
 
 ## A tour of the interface
 
 ### Generate
 
-Type a prompt, pick a quality preset and press **Generate**. With **AI boost**
+Type a prompt, pick a line in **Quality and speed** and press **Generate**.
+The list on the right runs from the fastest choice to the best, and each line
+says its steps and image size. With **AI boost**
 on, the prompt is first rewritten by your language model. **Rewrite now**
 shows the rewritten text before you generate, so you can review or edit it.
 Whatever is in the *Rewritten prompt* box is what the model receives.
@@ -75,7 +82,7 @@ also sit under the Edit tab's result. Click the result (or a filled reference
 cell) to view it full size: click again for 100%, drag to pan, arrow keys for
 the other results, Esc to close.
 
-![Generate tab: a short prompt, its AI-boosted rewrite and the result](docs/images/generate.webp)
+![Generate tab: references on the left, the result, the Quality and speed list on the right, the prompt below](docs/images/generate.webp)
 
 Each reference cell has two small icons in its bottom corners. The figure
 opens a pose library: pick a pose and its OpenPose skeleton goes into the
@@ -131,8 +138,10 @@ Double-click a thumbnail to view it full size.
 ### Settings
 
 This tab holds the language model address, the system prompts used by AI boost,
-the **performance** choices (transformer precision, memory profile and
-SageAttention) and a GPU memory report. The access token is write-only: the page never shows it.
+the **performance** choices and a GPU memory report. *Model precision* and
+*Memory profile* are lists in which every option states its video memory and
+the cards it is for; the precision that fits your card is marked, and *Auto*
+says what it becomes on your card. The access token is write-only: the page never shows it.
 
 ![Settings tab](docs/images/settings.webp)
 
@@ -152,6 +161,23 @@ weights then don't cross the PCIe bus on every generation (see
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), section 3). If RAM is short, run
 with `--no-pin-memory`. Cards under 20 GB get the "low" profile automatically —
 see [Cards with 6–16 GB](#cards-with-616-gb).
+
+## Which settings for my card
+
+The installer looks at your card and proposes the precision from this table;
+the memory profile stays on *Auto*. Everything can be changed later on the
+Settings tab.
+
+| Video memory | Precision (installer default) | Memory profile (*Auto*) | Start with |
+|---|---|---|---|
+| 20 GB and more | bf16 (INT8 frees 6.5 GiB for references) | high | Medium, Turbo |
+| 12–20 GB | INT8 | low | Low, Turbo |
+| 10–12 GB | GGUF Q8_0 | low | Low, Turbo |
+| 8 GB | GGUF Q4_K_M | low | Turbo4, Turbo, Low |
+| 6 GB (not tested) | GGUF Q4_K_S or Q3_K_M | low | Draft, Turbo |
+
+Tested on an RTX 3090 (24 GB) and an RTX 4060 Laptop (8 GB); the rows in
+between follow from the measured weight of each variant.
 
 ## Installation
 
@@ -222,7 +248,7 @@ Arguments are passed through to the application:
 |---|---|
 | `--host`, `--port` | listen address (default `0.0.0.0:7865`) |
 | `--lang en\|ru` | interface language at start (default `en`; switch any time with the EN/RU button) |
-| `--preset LowQuality\|MiddleQuality\|MaxQuality` | default quality preset |
+| `--preset LowQuality\|MiddleQuality\|MaxQuality\|Turbo\|TurboDraft\|Turbo4` | default quality preset |
 | `--no-open-browser` | don't open the browser |
 | `--no-preload` | load the model on first use instead of at start |
 | `--no-pin-memory` | don't pin the text encoder in RAM (saves 16+ GB, slower model swaps) |
@@ -236,14 +262,19 @@ The full guide is in Russian: [docs/USAGE.md](docs/USAGE.md). The essentials fol
 
 ### Quality presets
 
-| Preset | Resolution | Steps | Time on RTX 3090 |
-|---|---|---|---|
-| LowQuality | 1024 px | 16 | ~21 s |
-| MiddleQuality | 1536 px | 28 | ~93 s |
-| MaxQuality | 2048 px | 40 | ~283 s |
-| **Turbo** | 1024 px | 6 | ~11 s |
-| **TurboDraft** | 768 px | 6 | ~5 s |
-| **Turbo4** | 1024 px | 4 | 19.3 s on an RTX 4060 Laptop (Turbo there: 28.7 s) |
+The interface names the presets by what they give; the names in brackets
+are what `--preset`, saved prompts and the PNG parameters use.
+
+| In the interface | Resolution | Steps | RTX 3090 | RTX 4060 Laptop 8 GB |
+|---|---|---|---|---|
+| **Draft** (TurboDraft) | 768 px | 6 | ~5 s | 18.8 s |
+| **Turbo** | 1024 px | 6 | ~11 s | 31.9 s |
+| **Turbo4** | 1024 px | 4 | | 19.3 s* |
+| Low (LowQuality) | 1024 px | 16 | ~21 s | 66.5 s |
+| Medium (MiddleQuality) | 1536 px | 28 | ~93 s | 215.4 s |
+| Maximum, 2K (MaxQuality) | 2048 px | 40 | ~283 s | |
+
+<sub>* Turbo4 against Turbo on the same laptop: 19.3 s and 28.7 s for a cached prompt.</sub>
 
 **Turbo** uses [Qwen-Image-2.1-viggle-turbo](https://huggingface.co/Viggle/Qwen-Image-2.1-viggle-turbo),
 a distilled LoRA for this model: 6 steps without CFG instead of 16–40, for
@@ -272,7 +303,8 @@ switching to Turbo4 and back swaps the transformer: about 4 s on 8 GB; on
 
 ### Speed and memory: precision and SageAttention
 
-On the Settings tab, under *Transformer precision*:
+On the Settings tab, under *Model precision* (lower in the list means less
+video memory and more visible quality loss):
 
 - **bf16** — the original weights, 13.3 GiB of VRAM;
 - **INT8** — [Unsloth's INT8 weights](https://huggingface.co/unsloth/Qwen-Image-2.1-FP8)
@@ -489,7 +521,7 @@ tests/         unit tests (no GPU needed)
 .venv\Scripts\python -m pip install -r requirements-dev.txt
 .venv\Scripts\python -m playwright install chromium
 
-.venv\Scripts\python -m pytest -q                 # 800+ unit tests, no GPU needed
+.venv\Scripts\python -m pytest -q                 # 1300+ unit tests, no GPU needed
 .venv\Scripts\python -m ruff check .              # lint, rules in ruff.toml
 .venv\Scripts\python tools\ui_check.py            # the interface in a real browser, fake generator
 .venv\Scripts\python tools\smoke.py               # end-to-end run with the real model

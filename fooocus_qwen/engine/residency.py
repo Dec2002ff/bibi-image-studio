@@ -29,10 +29,14 @@ from contextlib import contextmanager
 
 import torch
 
+# Имена политик — из плана весов (``engine/plan.py``): там решается, какая
+# нужна, и там же они объявлены, без torch.
+from .plan import STREAM, SWAP
+
 LOGGER = logging.getLogger(__name__)
 
 
-def _named_tensors(module: torch.nn.Module) -> Iterator[tuple[str, torch.Tensor]]:
+def named_tensors(module: torch.nn.Module) -> Iterator[tuple[str, torch.Tensor]]:
     """Параметры и буферы одним потоком.
 
     Буферы нельзя пропускать: у трансформера в них лежат таблицы поворотных
@@ -44,7 +48,7 @@ def _named_tensors(module: torch.nn.Module) -> Iterator[tuple[str, torch.Tensor]
         yield f"b:{name}", buffer
 
 
-def _place(module: torch.nn.Module, key: str, tensor: torch.Tensor, value: torch.Tensor) -> None:
+def place_tensor(module: torch.nn.Module, key: str, tensor: torch.Tensor, value: torch.Tensor) -> None:
     """Ставит на место тензора ``value`` — копию того же тензора на другом устройстве.
 
     Для обычного тензора это ``tensor.data = value``: объект параметра
@@ -70,7 +74,7 @@ def _place(module: torch.nn.Module, key: str, tensor: torch.Tensor, value: torch
         owner._buffers[attribute] = value
 
 
-def _nbytes(tensor: torch.Tensor) -> int:
+def tensor_nbytes(tensor: torch.Tensor) -> int:
     """Объём тензора в байтах, в том числе у подкласса с внутренними тензорами.
 
     У ``Int8Tensor`` ``numel() * element_size()`` считает логический bf16-вес,
@@ -79,7 +83,7 @@ def _nbytes(tensor: torch.Tensor) -> int:
     inner = getattr(tensor, "__tensor_flatten__", None)
     if inner is not None and type(tensor) not in (torch.Tensor, torch.nn.Parameter):
         names, _context = inner()
-        return sum(_nbytes(getattr(tensor, part)) for part in names)
+        return sum(tensor_nbytes(getattr(tensor, part)) for part in names)
     return tensor.numel() * tensor.element_size()
 
 
@@ -107,7 +111,7 @@ class StagedModule:
         self._nbytes = 0
 
         pin_failed = False
-        for name, tensor in _named_tensors(module):
+        for name, tensor in named_tensors(module):
             host = tensor.detach().to("cpu")
             if pin_memory and not pin_failed:
                 try:
@@ -118,8 +122,8 @@ class StagedModule:
                     LOGGER.warning("Failed to pin memory, continuing without it: %s", error)
                     pin_failed = True
             self._host[name] = host
-            self._nbytes += _nbytes(host)
-            _place(module, name, tensor, host)
+            self._nbytes += tensor_nbytes(host)
+            place_tensor(module, name, tensor, host)
 
     @property
     def resident(self) -> bool:
@@ -146,8 +150,8 @@ class StagedModule:
         # устройстве при флаге «на хосте».
         self._placement = _MIXED
         try:
-            for name, tensor in _named_tensors(self.module):
-                _place(self.module, name, tensor, self._host[name].to(self._device, non_blocking=True))
+            for name, tensor in named_tensors(self.module):
+                place_tensor(self.module, name, tensor, self._host[name].to(self._device, non_blocking=True))
             if self._device.type == "cuda":
                 # Копирование из закреплённой памяти асинхронное: без синхронизации
                 # первый же вызов модуля прочитал бы наполовину заполненные веса.
@@ -163,8 +167,8 @@ class StagedModule:
             return
 
         self._placement = _MIXED
-        for name, tensor in _named_tensors(self.module):
-            _place(self.module, name, tensor, self._host[name])
+        for name, tensor in named_tensors(self.module):
+            place_tensor(self.module, name, tensor, self._host[name])
         self._placement = _HOST
         if self._device.type == "cuda":
             # Кеширующий аллокатор не возвращает освобождённые блоки драйверу
@@ -199,7 +203,7 @@ class DeviceModule:
     def __init__(self, module: torch.nn.Module, device: str | torch.device) -> None:
         self.module = module
         self._device = torch.device(device)
-        self._nbytes = sum(_nbytes(tensor) for _name, tensor in _named_tensors(module))
+        self._nbytes = sum(tensor_nbytes(tensor) for _name, tensor in named_tensors(module))
 
     @property
     def resident(self) -> bool:
@@ -219,8 +223,6 @@ class DeviceModule:
         """Ничего не делает: этот модуль с устройства не уходит."""
 
 
-SWAP = "swap"
-STREAM = "stream"
 POLICIES = (SWAP, STREAM)
 
 
@@ -248,6 +250,10 @@ class ResidencyManager:
     @property
     def policy(self) -> str:
         return self._policy
+
+    @property
+    def device(self) -> torch.device:
+        return self._device
 
     def start(self) -> None:
         """Раскладывает модели по местам. Вызывается один раз после загрузки."""

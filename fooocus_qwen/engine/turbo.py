@@ -115,11 +115,14 @@ class TurboAdapter:
         self._active = enabled
 
 
-def call_arguments(arguments: dict) -> dict:
-    """Аргументы вызова пайплайна для turbo: шаги, узлы, без CFG и негатива."""
+def call_arguments(arguments: dict, sigmas: tuple[float, ...] = SIGMAS) -> dict:
+    """Аргументы вызова пайплайна для дистиллята: его узлы, без CFG и негатива.
+
+    ``sigmas`` — узлы Turbo (``SIGMAS``) или Turbo4 (``SIGMAS4``).
+    """
     changed = dict(arguments)
-    changed["num_inference_steps"] = len(SIGMAS)
-    changed["sigmas"] = list(SIGMAS)
+    changed["num_inference_steps"] = len(sigmas)
+    changed["sigmas"] = list(sigmas)
     changed["true_cfg_scale"] = 1.0
     changed["negative_prompt"] = None
     return changed
@@ -207,12 +210,3 @@ class Turbo4Transformer:
         self._pipe.scheduler = self._base_scheduler
         self._active = False
 
-
-def call_arguments4(arguments: dict) -> dict:
-    """Аргументы вызова для Turbo4: 4 шага, равномерные узлы, без CFG и негатива."""
-    changed = dict(arguments)
-    changed["num_inference_steps"] = len(SIGMAS4)
-    changed["sigmas"] = list(SIGMAS4)
-    changed["true_cfg_scale"] = 1.0
-    changed["negative_prompt"] = None
-    return changed

@@ -12,7 +12,8 @@ import torch
 from . import attention, vae_tiling
 from .embeds_cache import EmbedsCache
 from .pipeline import QwenImage21StudioPipeline, assert_contract
-from .residency import STREAM, SWAP, ResidencyManager
+from .plan import STREAM, SWAP
+from .residency import ResidencyManager
 
 LOGGER = logging.getLogger(__name__)
 

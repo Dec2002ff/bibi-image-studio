@@ -42,6 +42,48 @@ MEMORY_PROFILES: tuple[str, ...] = (MEMORY_AUTO, MEMORY_HIGH, MEMORY_LOW)
 HIGH_PROFILE_MIN_GIB = 20.0
 
 
+
+@dataclass(frozen=True)
+class PrecisionInfo:
+    """Цена выбора точности — одна на интерфейс и установку.
+
+    ``vram_gib`` — трансформер на карте (файлы Unsloth для GGUF), ``cards``
+    — для каких карт вариант (ГБ), ``note`` — (ru, en): чем он отличается.
+    """
+
+    title: str
+    vram_gib: float
+    cards: str
+    note: tuple[str, str]
+
+
+# От точного к компактному — в том же порядке, что ``PRECISIONS``.
+PRECISION_INFO: dict[str, PrecisionInfo] = {
+    PRECISION_BF16: PrecisionInfo("bf16", 13.3, "24", ("исходные веса, эталон качества", "original weights, reference quality")),
+    PRECISION_INT8: PrecisionInfo("INT8", 6.8, "12–24", ("почти без потерь, скорость та же", "nearly lossless, same speed")),
+    "Q8_0": PrecisionInfo("GGUF Q8_0", 6.6, "10–16", ("ближе всех к bf16", "closest to bf16")),
+    "Q6_K": PrecisionInfo("GGUF Q6_K", 5.4, "10–12", ("потеря едва заметна", "barely visible loss")),
+    "Q5_K_M": PrecisionInfo("GGUF Q5_K_M", 4.7, "8–10", ("на 8 ГБ впритык", "tight on 8 GB")),
+    "Q4_K_M": PrecisionInfo("GGUF Q4_K_M", 3.9, "6–8", ("основной выбор для 8 ГБ", "the main choice for 8 GB")),
+    "Q4_K_S": PrecisionInfo("GGUF Q4_K_S", 3.4, "6–8", ("если Q4_K_M не помещается", "if Q4_K_M runs out of memory")),
+    "Q3_K_M": PrecisionInfo("GGUF Q3_K_M", 2.7, "6", ("заметная потеря качества — крайний случай", "visible quality loss — last resort")),
+}
+
+
+def precision_label(precision: str, lang: str = "en", recommended: bool = False) -> str:
+    """Подпись варианта точности: что это, сколько видеопамяти, для каких карт.
+
+    ``recommended`` — пометка «подходит вашей карте»
+    (``recommended_precision``).
+    """
+    info = PRECISION_INFO[precision]
+    if lang == "ru":
+        text = f"{info.title} — {info.note[0]} · {info.vram_gib} ГиБ · карты {info.cards} ГБ"
+        return text + (" ← под вашу карту" if recommended else "")
+    text = f"{info.title} — {info.note[1]} · {info.vram_gib} GiB · {info.cards} GB cards"
+    return text + (" ← fits your card" if recommended else "")
+
+
 def is_gguf(precision: str) -> bool:
     return precision in GGUF_VARIANTS
 

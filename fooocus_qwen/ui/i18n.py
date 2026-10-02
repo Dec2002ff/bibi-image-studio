@@ -54,7 +54,7 @@ T: dict[str, tuple[str, str]] = {
     "generate": ("Сгенерировать", "Generate"),
     "stop": ("Прервать", "Stop"),
     "advanced": ("Продвинутое", "Advanced"),
-    "quality": ("Качество", "Quality"),
+    "quality": ("Качество и скорость", "Quality and speed"),
     "aspect": ("Соотношение сторон", "Aspect ratio"),
     # Единственный пункт выпадающего списка соотношений, который на самом деле
     # текст интерфейса, а не идентификатор: остальные семь — числовые
@@ -170,7 +170,11 @@ T: dict[str, tuple[str, str]] = {
     "llm_token": ("Токен", "Token"),
     "llm_token_placeholder": ("Пусто — оставить прежний", "Empty keeps the current one"),
     "llm_forget_token": ("Убрать токен", "Remove the token"),
-    "perf_precision": ("Точность трансформера", "Transformer precision"),
+    "perf_precision": ("Точность модели: память или качество", "Model precision: memory vs. quality"),
+    "perf_precision_info": (
+        "чем ниже в списке, тем меньше видеопамяти и заметнее потеря качества",
+        "lower in the list means less video memory and more visible quality loss",
+    ),
     "perf_apply": ("Применить точность", "Apply precision"),
     "perf_sage": ("SageAttention — быстрое внимание", "SageAttention — fast attention"),
     "perf_profile": ("Профиль памяти", "Memory profile"),

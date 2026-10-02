@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+from functools import cache
 
+
+@cache
 def vram_gib(device: int = 0) -> float | None:
-    """Полный объём видеопамяти в ГиБ или ``None``, если CUDA нет."""
+    """Полный объём видеопамяти в ГиБ или ``None``, если CUDA нет.
+
+    Запоминается: объём карты за время работы не меняется, а спрашивают его
+    часто — интерфейс при каждой проверке готовности Turbo.
+    """
     try:
         import torch
     except ImportError:  # pragma: no cover — без torch движок не работает

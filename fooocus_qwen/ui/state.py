@@ -135,42 +135,30 @@ class Studio:
         if self._generator is None:
             with self._lock:
                 if self._generator is None:
-                    from ..engine import fetch, loader, text_encoder
-                    from ..engine import residency as residency_module
+                    from ..engine import fetch, loader
                     from ..engine.generator import Generator
                     from ..engine.turbo import Turbo4Transformer, TurboAdapter
 
                     chosen = settings_module.load()
-                    low = self.memory_profile() == settings_module.MEMORY_LOW
-                    int8_file = gguf_file = te_dir = None
-                    if chosen.precision == settings_module.PRECISION_INT8:
-                        int8_file = config.INT8_DIR / fetch.INT8_FILE
-                    elif settings_module.is_gguf(chosen.precision):
-                        gguf_file = config.GGUF_DIR / fetch.gguf_file(chosen.precision)
-                    if low:
-                        te_dir = config.TE_INT8_DIR
-                        text_encoder.ensure(self.config.model_dir / "text_encoder", te_dir)
+                    plan = self.weights_plan()
+                    plan.ensure_text_encoder()
                     pipe, residency, cache = loader.load(
                         self.config.model_dir,
                         pin_memory=self.config.pin_memory,
-                        int8_file=int8_file,
                         sage_attention=chosen.sage_attention,
-                        gguf_file=gguf_file,
-                        text_encoder_dir=te_dir,
-                        policy=residency_module.STREAM if low else residency_module.SWAP,
+                        **plan.loader_arguments(),
                     )
-                    turbo = TurboAdapter(pipe, residency, config.TURBO_DIR, light=low)
-                    policy = residency_module.STREAM if low else residency_module.SWAP
+                    turbo = TurboAdapter(pipe, residency, config.TURBO_DIR, light=plan.low)
                     turbo4 = Turbo4Transformer(
                         pipe, residency, config.GGUF_DIR / fetch.TURBO4_FILE, config.TURBO_DIR,
                         self.config.model_dir,
                         base_loader=loader.base_transformer_loader(
-                            self.config.model_dir, int8_file=int8_file, gguf_file=gguf_file
+                            self.config.model_dir, int8_file=plan.int8_file, gguf_file=plan.gguf_file
                         ),
                         # Механизм внимания — по настройке на момент подмены:
                         # его меняют на лету, и подменённый должен следовать.
                         prepare=lambda module: loader.prepare_transformer(
-                            module, settings_module.load().sage_attention, policy, "cuda"
+                            module, settings_module.load().sage_attention, plan.policy, residency.device
                         ),
                         turbo=turbo,
                     )
@@ -212,24 +200,25 @@ class Studio:
             return say("turbo_download_failed", lang, error=_quote(error))
         return None
 
+    def weights_plan(self, **changes):
+        """Следствия выбора из настроек (``engine/plan.py``); ``changes`` — поправки к нему."""
+        from ..engine import plan
+
+        return plan.resolve(model_dir=self.config.model_dir, **changes)
+
     def memory_profile(self) -> str:
         """Профиль памяти, в котором работает (или будет работать) модель: «high» или «low».
 
         «auto» из настроек решается по объёму видеопамяти
         (``settings.resolve_profile``).
         """
-        from ..engine import hardware
-
-        return settings_module.resolve_profile(settings_module.load().memory_profile, hardware.vram_gib())
-
-    def _light_turbo(self) -> bool:
-        return self.memory_profile() == settings_module.MEMORY_LOW
+        return self.weights_plan().profile
 
     def ensure_turbo_weights(self) -> bool:
         """Докачивает веса turbo, если их нет. ``True`` — что-то качалось."""
         from ..engine import fetch
 
-        return fetch.ensure_turbo(config.TURBO_DIR, light=self._light_turbo())
+        return fetch.ensure_turbo(config.TURBO_DIR, light=self.weights_plan().low)
 
     def turbo4_weights_present(self) -> bool:
         from ..engine import fetch
@@ -253,22 +242,17 @@ class Studio:
     def turbo_weights_present(self) -> bool:
         from ..engine import fetch
 
-        return not fetch.missing_extra(config.TURBO_DIR, fetch.turbo_files(self._light_turbo()))
+        return not fetch.missing_extra(config.TURBO_DIR, self.weights_plan().turbo_files)
 
     def ensure_precision_weights(self, precision: str) -> bool:
         """Докачивает веса выбранной точности. ``True`` — что-то качалось.
 
         Для INT8 это файл Unsloth; для GGUF — файл варианта (Unsloth); для
         bf16 — шарды bf16-трансформера, которых нет у того, кто ставил
-        приложение сразу в INT8 или GGUF.
+        приложение сразу в INT8 или GGUF. bf16-шарды энкодера при этом не
+        качаются, если его INT8-копия уже собрана (``WeightsPlan``).
         """
-        from ..engine import fetch
-
-        if precision == settings_module.PRECISION_INT8:
-            return fetch.ensure_int8(config.INT8_DIR)
-        if settings_module.is_gguf(precision):
-            return fetch.ensure_gguf(config.GGUF_DIR, precision)
-        return fetch.ensure_model(self.config.model_dir, include_transformer=True)
+        return self.weights_plan(precision=precision).ensure_weights()
 
     def switch_precision(self, precision: str) -> None:
         """Сохраняет выбор точности и выгружает модель: следующая загрузка — в новой.

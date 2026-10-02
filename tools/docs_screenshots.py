@@ -43,8 +43,11 @@ from fooocus_qwen.engine.generator import GenerationRequest  # noqa: E402
 from fooocus_qwen.imaging import metadata  # noqa: E402
 from fooocus_qwen.logging_setup import use_utf8_console  # noqa: E402
 from fooocus_qwen.storage import gallery  # noqa: E402
+from fooocus_qwen.ui import quality  # noqa: E402
 
 IMAGES = ROOT / "docs" / "images"
+# Подпись пресета LowQuality в интерфейсе: «Low — 16 steps, 1024 px».
+LOW = quality.label("LowQuality", "en")
 WORK = ROOT / "tmp" / "docs_screenshots"
 PORT = 7894
 # Ширина картинок в README: GitHub показывает содержимое примерно в 1000 px,
@@ -152,6 +155,16 @@ def phase_showcase() -> None:
 
 # --- фаза 2: интерфейс -----------------------------------------------------------
 
+def language_model_reachable() -> bool:
+    from fooocus_qwen.llm import LlmClient, LlmError, load_endpoint
+
+    try:
+        LlmClient(load_endpoint(config.ENDPOINT_FILE), timeout=15).ping()
+    except (LlmError, OSError, ValueError):
+        return False
+    return True
+
+
 def phase_ui(mask_box: tuple[float, float, float, float]) -> None:
     import ui_check as u
     from playwright.sync_api import sync_playwright
@@ -208,15 +221,20 @@ def phase_ui(mask_box: tuple[float, float, float, float]) -> None:
         print("generation:")
         # Окно выше обычного: в кадр должно войти поле переписанного промта.
         page, _ = u.fresh_page(browser, url, 1920, 1240)
-        visible(page.get_by_label("LowQuality", exact=True)).check()
+        visible(page.get_by_label(LOW, exact=True)).check()
         visible(page.locator("textarea")).fill("a red fox in a snowy birch forest at golden hour")
         # «Rewrite now» показывает переписанный промт до генерации — ради него
-        # снимок и нужен; галочку AI boost кнопка включает сама.
-        u.click_text(page, "Rewrite now")
-        page.wait_for_function(
-            "() => [...document.querySelectorAll('textarea')].some(t => t.offsetParent && t.value.length > 80)",
-            timeout=120000,
-        )
+        # снимок и нужен; галочку AI boost кнопка включает сама. Сервер языковой
+        # модели — чужая машина и бывает выключен: тогда снимок без переписки,
+        # а не падение всей фазы.
+        if language_model_reachable():
+            u.click_text(page, "Rewrite now")
+            page.wait_for_function(
+                "() => [...document.querySelectorAll('textarea')].some(t => t.offsetParent && t.value.length > 80)",
+                timeout=120000,
+            )
+        else:
+            print("  language model unreachable: the shot goes without AI boost")
         before = outputs()
         u.click_text(page, "Generate")
         wait_for_output(before, page)
@@ -239,7 +257,7 @@ def phase_ui(mask_box: tuple[float, float, float, float]) -> None:
         shot(page, "pose-window")
         page.locator(".qs-posegrid img").nth(names.index(POSE_EXAMPLE)).click()
         u.wait_loaded(page, [0])
-        visible(page.get_by_label("LowQuality", exact=True)).check()
+        visible(page.get_by_label(LOW, exact=True)).check()
         visible(page.locator("textarea")).fill(POSE_PROMPT)
         before = outputs()
         u.click_text(page, "Generate")
@@ -264,7 +282,7 @@ def phase_ui(mask_box: tuple[float, float, float, float]) -> None:
         u.open_tab(page, 1)
         source = WORK / "showcase-mug.png"
         u.load_into_painter(page, source)
-        visible(page.get_by_label("LowQuality", exact=True)).check()
+        visible(page.get_by_label(LOW, exact=True)).check()
         x0, y0, x1, y1 = mask_box
         steps = 7
         for row in range(steps):
@@ -285,7 +303,7 @@ def phase_ui(mask_box: tuple[float, float, float, float]) -> None:
         u.open_tab(page, 1)
         source = WORK / "showcase-fox.png"
         u.load_into_painter(page, source)
-        visible(page.get_by_label("LowQuality", exact=True)).check()
+        visible(page.get_by_label(LOW, exact=True)).check()
         page.get_by_label("Annotation", exact=True).check()
         page.wait_for_timeout(500)
         u.stroke(page, [(0.33, 0.12), (0.8, 0.09), (0.83, 0.55), (0.36, 0.52), (0.33, 0.12)], steps=20)
@@ -311,7 +329,7 @@ def phase_ui(mask_box: tuple[float, float, float, float]) -> None:
         u.open_tab(page, 1)
         source = WORK / "showcase-storefront.png"
         width = u.load_into_painter(page, source)["width"]
-        visible(page.get_by_label("LowQuality", exact=True)).check()
+        visible(page.get_by_label(LOW, exact=True)).check()
         page.get_by_text("Outpaint", exact=True).first.click()
         page.wait_for_timeout(500)
         page.get_by_label("←", exact=True).check()
@@ -347,7 +365,8 @@ def phase_ui(mask_box: tuple[float, float, float, float]) -> None:
         example = WORK / "llm_endpoint.txt"
         example.write_text("llama.cpp\n192.168.1.10:8080\n", encoding="utf-8")
         config.ENDPOINT_FILE = example
-        page, _ = u.fresh_page(browser, url, 1920, 1080)
+        # Выше обычного: точность и профиль памяти — столбцы вариантов.
+        page, _ = u.fresh_page(browser, url, 1920, 1240)
         u.open_tab(page, 3)
         page.wait_for_timeout(1000)
         shot(page, "settings")

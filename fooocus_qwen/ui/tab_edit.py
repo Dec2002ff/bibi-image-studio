@@ -32,8 +32,9 @@ from ..imaging import masking, metadata, outpaint
 from ..prompting import boost as boost_module
 from ..storage import gallery
 from . import layout, painter, reference_tools
+from . import quality as quality_choices
 from . import references as references_module
-from .i18n import Localizer, painter_labels, pick, say, sentences
+from .i18n import Localizer, T, painter_labels, pick, say, sentences
 from .state import GPU_CONCURRENCY_ID, describe_failure, seeds_phrase
 
 LOGGER = logging.getLogger(__name__)
@@ -297,8 +298,12 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                 ),
             )
             quality = localizer.bind(
-                gr.Radio(choices=list(presets.NAMES), value=studio.config.preset, label=pick("quality", lang)),
-                label=("Качество", "Quality"),
+                gr.Radio(
+                    choices=quality_choices.choices(lang), value=studio.config.preset,
+                    label=pick("quality", lang), elem_classes=[layout.CHOICES],
+                ),
+                label=T["quality"],
+                choices=(quality_choices.choices("ru"), quality_choices.choices("en")),
             )
             status = localizer.bind(
                 gr.Textbox(

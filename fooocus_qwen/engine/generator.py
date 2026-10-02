@@ -401,7 +401,7 @@ class Generator:
             if use_turbo:
                 arguments = turbo_module.call_arguments(arguments)
             elif use_turbo4:
-                arguments = turbo_module.call_arguments4(arguments)
+                arguments = turbo_module.call_arguments(arguments, turbo_module.SIGMAS4)
             output = self._pipe(**arguments)
 
             if self._interrupted:

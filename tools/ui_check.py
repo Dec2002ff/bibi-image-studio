@@ -1256,7 +1256,44 @@ def scenario_pose_edit(browser, url, report: Report, fake: FakeGenerator, sample
     page.close()
 
 
-def scenario_performance(browser, url, report: Report, fake: FakeGenerator) -> None:
+def choices_are_stacked(page, texts) -> bool:
+    """Варианты стоят столбцом: левый край общий, каждый ниже предыдущего."""
+    boxes = [visible_label_box(page, text) for text in texts]
+    if None in boxes or len(boxes) < 2:
+        return False
+    lefts = {round(box["x"]) for box in boxes}
+    tops = [box["y"] for box in boxes]
+    return len(lefts) == 1 and tops == sorted(tops) and len(set(tops)) == len(tops)
+
+
+def visible_label_box(page, text: str):
+    for item in page.get_by_label(text, exact=True).all():
+        if item.is_visible():
+            return item.locator("xpath=ancestor::label[1]").bounding_box()
+    return None
+
+
+def scenario_quality(browser, url, report: Report, samples: Path) -> None:
+    """«Качество и скорость» на генерации и правке: столбцом и словами, значение — имя пресета."""
+    from fooocus_qwen.ui import quality
+
+    print("quality choices:")
+    page, errors = fresh_page(browser, url)
+    texts = [text for text, _name in quality.choices("en")]
+    report.check(choices_are_stacked(page, texts), "Generate: quality options stand in a column, fast to best")
+    report.check(visible_input(page, quality.label(config.AppConfig().preset, "en")).is_checked(),
+                 "the default preset is selected")
+    shot = samples.parent / "quality.png"
+    page.screenshot(path=str(shot))
+    print(f"  screenshot: {shot}")
+    open_tab(page, 1)
+    page.wait_for_timeout(500)
+    report.check(choices_are_stacked(page, texts), "Edit: quality options stand in a column too")
+    report.check(not errors, "no page errors" + (f": {errors[:2]}" if errors else ""))
+    page.close()
+
+
+def scenario_performance(browser, url, report: Report, fake: FakeGenerator, samples: Path) -> None:
     """Секция «Производительность»: состояние, точность, SageAttention на лету."""
     print("performance:")
     from fooocus_qwen import settings
@@ -1268,15 +1305,20 @@ def scenario_performance(browser, url, report: Report, fake: FakeGenerator) -> N
     status = " ".join(box.input_value() for box in page.locator("textarea").all())
     report.check("Precision: BF16" in status and "Memory profile:" in status,
                  "status shows precision, memory profile and Turbo")
-    # Точность — выпадающий список (вариантов восемь: bf16, INT8 и GGUF).
-    chosen = page.get_by_label("Transformer precision").input_value()
-    report.check(chosen.startswith("bf16 — original precision"), f"current precision is selected: {chosen!r}")
-    page.get_by_label("Transformer precision").click()
-    page.wait_for_timeout(300)
-    report.check(page.get_by_role("option", name="GGUF Q4_K_M — 3.9 GiB (recommended for 6–8 GB)").count() == 1,
-                 "GGUF variants are offered next to bf16 and INT8")
-    page.keyboard.press("Escape")
-    report.check(page.get_by_label("Auto — by the amount of VRAM").is_checked(), "memory profile Auto is selected")
+    # Точность — столбец радиокнопок (bf16, INT8 и шесть GGUF), подписи из
+    # общего каталога; подходящая карте помечена.
+    from fooocus_qwen.engine import hardware
+
+    labels = {name: settings.precision_label(name, "en", recommended=name == settings.recommended_precision(
+        hardware.vram_gib())) for name in settings.PRECISIONS}
+    report.check(page.get_by_label(labels["bf16"], exact=True).is_checked(),
+                 f"current precision is selected: {labels['bf16']!r}")
+    offered = [name for name, text in labels.items() if page.get_by_label(text, exact=True).count() == 1]
+    report.check(offered == list(settings.PRECISIONS), f"all precisions are offered, one per line: {offered}")
+    report.check(page.get_by_label("Auto — by the video card", exact=False).first.is_checked(),
+                 "memory profile Auto is selected")
+    report.check(choices_are_stacked(page, labels.values()), "precision options stand in a column")
+    page.screenshot(path=str(samples.parent / "settings.png"))
 
     sage = page.get_by_label("SageAttention — fast attention")
     if not attention.sage_available():
@@ -1382,7 +1424,8 @@ def main() -> int:
         "viewer": lambda b, r: scenario_viewer(b, url, r, fake, samples),
         "sketch": lambda b, r: scenario_sketch_colour(b, url, r, fake, samples),
         "poses": lambda b, r: scenario_pose_edit(b, url, r, fake, samples),
-        "performance": lambda b, r: scenario_performance(b, url, r, fake),
+        "quality": lambda b, r: scenario_quality(b, url, r, samples),
+        "performance": lambda b, r: scenario_performance(b, url, r, fake, samples),
         "secret": lambda b, r: scenario_secret(b, url, r),
     }
     chosen = args.only or list(scenarios)

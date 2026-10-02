@@ -48,25 +48,21 @@ def selftest() -> int:
 
     # Производительность: выбор из user/settings.json и то, что ему нужно.
     from . import settings
-    from .engine import attention, fetch, hardware, text_encoder
+    from .engine import attention, fetch, hardware
+    from .engine import plan as plan_module
 
     chosen = settings.load()
     vram = hardware.vram_gib()
-    profile = settings.resolve_profile(chosen.memory_profile, vram)
-    print(f"[ok ] memory profile: {profile} (setting: {chosen.memory_profile})")
-    if chosen.precision == settings.PRECISION_INT8:
-        if fetch.missing_extra(config.INT8_DIR, (fetch.INT8_FILE,)):
-            problems.append("INT8 precision is selected but its weights are missing: run --fetch-model")
-            print(f"[no ] INT8 precision: missing {config.INT8_DIR / fetch.INT8_FILE}")
+    plan = plan_module.resolve(chosen, vram_gib=vram)
+    print(f"[ok ] memory profile: {plan.profile} (setting: {chosen.memory_profile})")
+    title = settings.PRECISION_INFO[chosen.precision].title
+    if plan.int8_file is not None or plan.gguf_file is not None:
+        missing = plan.missing_transformer()
+        if missing:
+            problems.append(f"{title} precision is selected but its weights are missing: run --fetch-model")
+            print(f"[no ] {title} precision: missing {missing[0]}")
         else:
-            print("[ok ] INT8 precision, weights found")
-    elif settings.is_gguf(chosen.precision):
-        name = fetch.gguf_file(chosen.precision)
-        if fetch.missing_extra(config.GGUF_DIR, (name,)):
-            problems.append(f"GGUF {chosen.precision} is selected but its file is missing: run --fetch-model")
-            print(f"[no ] GGUF {chosen.precision}: missing {config.GGUF_DIR / name}")
-        else:
-            print(f"[ok ] GGUF {chosen.precision}, weights found")
+            print(f"[ok ] {title} precision, weights found")
     else:
         print("[ok ] bf16 precision")
     recommended = settings.recommended_precision(vram)
@@ -75,8 +71,8 @@ def selftest() -> int:
         # Список точностей идёт от тяжёлой к лёгкой: выбранная тяжелее
         # рекомендованной — вероятна нехватка видеопамяти.
         print(f"[!! ] {chosen.precision} may not fit in {vram:.1f} GiB of VRAM; {recommended} is recommended")
-    if profile == settings.MEMORY_LOW:
-        if text_encoder.is_current(config.TE_INT8_DIR, config.MODEL_DIR / "text_encoder"):
+    if plan.low:
+        if plan.text_encoder_ready():
             print("[ok ] INT8 text encoder built")
         else:
             print("[--] INT8 text encoder will be built on first start (about 20 s): or run --fetch-model")
@@ -93,7 +89,7 @@ def selftest() -> int:
         print(f"[no ] pose detection: DWPose weights missing in {config.DWPOSE_DIR}")
     else:
         print("[ok ] pose detection: DWPose weights found")
-    turbo_ready = not fetch.missing_extra(config.TURBO_DIR, fetch.turbo_files(profile == settings.MEMORY_LOW))
+    turbo_ready = not fetch.missing_extra(config.TURBO_DIR, plan.turbo_files)
     print("[ok ] Turbo: weights found" if turbo_ready else "[--] Turbo: weights will be downloaded when the preset is first selected")
     turbo4_ready = not fetch.turbo4_missing(config.GGUF_DIR, config.TURBO_DIR)
     print("[ok ] Turbo4: weights found" if turbo4_ready else "[--] Turbo4: weights will be downloaded when the preset is first selected")
@@ -164,26 +160,14 @@ def fetch_model() -> int:
     веса распознавания позы (DWPose, 350 МБ, «Добавить позу»): без них первое
     распознавание ждало бы загрузки посреди работы.
     """
-    from . import settings
-    from .engine import fetch, hardware, text_encoder
+    from .engine import fetch
+    from .engine import plan as plan_module
     from .poses import detect
 
-    chosen = settings.load()
-    int8 = chosen.precision == settings.PRECISION_INT8
-    gguf = settings.is_gguf(chosen.precision)
-    low = settings.resolve_profile(chosen.memory_profile, hardware.vram_gib()) == settings.MEMORY_LOW
-    te_source = config.MODEL_DIR / "text_encoder"
-    te_ready = low and text_encoder.is_current(config.TE_INT8_DIR, te_source)
+    plan = plan_module.resolve()
     try:
-        downloaded = fetch.ensure_model(
-            config.MODEL_DIR, include_transformer=not (int8 or gguf), include_text_encoder=not te_ready
-        )
-        if int8:
-            downloaded = fetch.ensure_int8(config.INT8_DIR) or downloaded
-        if gguf:
-            downloaded = fetch.ensure_gguf(config.GGUF_DIR, chosen.precision) or downloaded
-        if low and not te_ready:
-            text_encoder.ensure(te_source, config.TE_INT8_DIR, out=lambda line: print(f"  {line}"))
+        downloaded = plan.ensure_weights()
+        if plan.ensure_text_encoder(out=lambda line: print(f"  {line}")):
             print(f"[ok ] INT8 text encoder built: {config.TE_INT8_DIR}")
         poses = fetch.ensure_files(config.DWPOSE_DIR, detect.REPO, detect.FILES)
     except fetch.ModelDownloadError as error:

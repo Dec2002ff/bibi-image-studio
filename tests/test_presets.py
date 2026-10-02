@@ -66,6 +66,6 @@ def test_turbo4_is_four_uniform_steps_on_its_own_transformer():
     assert preset.transformer == presets.TURBO4 and not preset.turbo
     assert preset.num_inference_steps == len(turbo.SIGMAS4) == 4
     assert preset.output_resolution == 1024
-    arguments = turbo.call_arguments4({"num_inference_steps": 16, "true_cfg_scale": 4.0, "negative_prompt": "x"})
+    arguments = turbo.call_arguments({"num_inference_steps": 16, "true_cfg_scale": 4.0, "negative_prompt": "x"}, turbo.SIGMAS4)
     assert arguments["sigmas"] == [1.0, 0.75, 0.5, 0.25]
     assert arguments["true_cfg_scale"] == 1.0 and arguments["negative_prompt"] is None

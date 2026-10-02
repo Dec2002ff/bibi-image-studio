@@ -30,7 +30,7 @@ from collections.abc import Iterable
 import torch
 from torch import nn
 
-from .residency import _named_tensors, _nbytes, _place
+from .residency import named_tensors, place_tensor, tensor_nbytes
 
 LOGGER = logging.getLogger(__name__)
 
@@ -65,14 +65,14 @@ class StreamedModule:
 
         self._host: dict[str, torch.Tensor] = {}
         self._nbytes = 0
-        for name, tensor in _named_tensors(module):
+        for name, tensor in named_tensors(module):
             host = tensor.detach()
             if host.device.type != "cpu":
                 host = host.to("cpu")
-                _place(module, name, tensor, host)
+                place_tensor(module, name, tensor, host)
             self._host[name] = host
-            self._nbytes += _nbytes(host)
-        # Общая часть — всё, что не внутри блоков. Ключи — как у _named_tensors:
+            self._nbytes += tensor_nbytes(host)
+        # Общая часть — всё, что не внутри блоков. Ключи — как у named_tensors:
         # «p:имя» и «b:имя».
         host_ids = {id(child) for child in host_modules}
         pinned_to_host = tuple(name + "." for name, child in module.named_modules() if id(child) in host_ids)
@@ -96,9 +96,9 @@ class StreamedModule:
             return
         self._on_device = True
         try:
-            for name, tensor in _named_tensors(self.module):
+            for name, tensor in named_tensors(self.module):
                 if name in self._shared:
-                    _place(self.module, name, tensor, self._host[name].to(self._device))
+                    place_tensor(self.module, name, tensor, self._host[name].to(self._device))
             for block in self._blocks:
                 self._handles.append(block.register_forward_pre_hook(self._lift))
                 self._handles.append(block.register_forward_hook(self._drop))
@@ -111,24 +111,24 @@ class StreamedModule:
         for handle in self._handles:
             handle.remove()
         self._handles.clear()
-        for name, tensor in _named_tensors(self.module):
+        for name, tensor in named_tensors(self.module):
             if tensor.device.type != "cpu":
-                _place(self.module, name, tensor, self._host[name])
+                place_tensor(self.module, name, tensor, self._host[name])
         self._on_device = False
         if self._device.type == "cuda":
             torch.cuda.empty_cache()
 
     def _lift(self, block: nn.Module, _args) -> None:
-        for name, tensor in _named_tensors(block):
-            _place(block, name, tensor, tensor.to(self._device))
+        for name, tensor in named_tensors(block):
+            place_tensor(block, name, tensor, tensor.to(self._device))
 
     def _drop(self, block: nn.Module, _args, _output) -> None:
         # Возврат — не копия: ставится обратно тот же тензор хоста. Он не
         # менялся, а копия на устройстве освобождается вместе с последней
         # ссылкой на неё.
         prefix = self._prefixes[id(block)]
-        for name, tensor in _named_tensors(block):
-            _place(block, name, tensor, self._host[name[:2] + prefix + name[2:]])
+        for name, tensor in named_tensors(block):
+            place_tensor(block, name, tensor, self._host[name[:2] + prefix + name[2:]])
 
 
 # --- KV-кэш префикса в оперативной памяти ------------------------------------------

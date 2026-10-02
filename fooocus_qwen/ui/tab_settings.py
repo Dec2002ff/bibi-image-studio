@@ -24,48 +24,52 @@ import gradio as gr
 
 from .. import config
 from .. import settings as settings_module
-from ..engine import attention
+from ..engine import attention, hardware
 from ..llm import LlmError, load_endpoint, parse_endpoint_file
 from ..llm import setup as llm_setup
 from . import layout
-from .i18n import MESSAGES, Localizer, pick, say, sentences
+from .i18n import MESSAGES, Localizer, T, pick, say, sentences
 from .state import GPU_CONCURRENCY_ID
 
-# Размеры GGUF — файлы Unsloth (ГиБ трансформера на карте). Варианты идут
-# от точного к компактному: чем ниже, тем меньше памяти и заметнее потеря.
-_GGUF_SIZES = {"Q8_0": 6.6, "Q6_K": 5.4, "Q5_K_M": 4.7, "Q4_K_M": 3.9, "Q4_K_S": 3.4, "Q3_K_M": 2.7}
 
-_PRECISION_CHOICES = {
-    "ru": [
-        ("bf16 — исходная точность, 13.3 ГиБ видеопамяти (24 ГБ)", settings_module.PRECISION_BF16),
-        ("INT8 — 6.8 ГиБ, скорость почти та же (12–24 ГБ)", settings_module.PRECISION_INT8),
-        *[
-            (f"GGUF {name} — {size} ГиБ" + (" (рекомендуется для 6–8 ГБ)" if name == "Q4_K_M" else ""), name)
-            for name, size in _GGUF_SIZES.items()
-        ],
-    ],
-    "en": [
-        ("bf16 — original precision, 13.3 GiB of VRAM (24 GB)", settings_module.PRECISION_BF16),
-        ("INT8 — 6.8 GiB, nearly the same speed (12–24 GB)", settings_module.PRECISION_INT8),
-        *[
-            (f"GGUF {name} — {size} GiB" + (" (recommended for 6–8 GB)" if name == "Q4_K_M" else ""), name)
-            for name, size in _GGUF_SIZES.items()
-        ],
-    ],
+def precision_choices(lang: str, vram_gib: float | None) -> list[tuple[str, str]]:
+    """Варианты точности: что это, сколько видеопамяти, для каких карт.
+
+    Подписи — из общего каталога (``settings.PRECISION_INFO``), того же, что
+    у установки; подходящий к этой карте вариант помечен.
+    """
+    recommended = settings_module.recommended_precision(vram_gib)
+    return [
+        (settings_module.precision_label(name, lang, recommended=name == recommended), name)
+        for name in settings_module.PRECISIONS
+    ]
+
+
+# Профиль: (для каких карт, как раскладываются веса) — (ru, en).
+_PROFILE_CARDS = {
+    settings_module.MEMORY_HIGH: ("Для карт от 20 ГБ", "For 20 GB cards and up"),
+    settings_module.MEMORY_LOW: ("Для карт 6–16 ГБ", "For 6–16 GB cards"),
+}
+_PROFILE_HOW = {
+    settings_module.MEMORY_HIGH: ("модели по очереди целиком на карте", "models take turns on the card whole"),
+    settings_module.MEMORY_LOW: (
+        "модель на карте, энкодер по слоям, кэш в ОЗУ",
+        "model on the card, encoder layer by layer, cache in RAM",
+    ),
 }
 
-_PROFILE_CHOICES = {
-    "ru": [
-        ("Авто — по объёму видеопамяти", settings_module.MEMORY_AUTO),
-        ("High — 20 ГБ и больше: модели меняются на карте целиком", settings_module.MEMORY_HIGH),
-        ("Low — 6–16 ГБ: энкодер INT8 по слою, KV-кэш в ОЗУ", settings_module.MEMORY_LOW),
-    ],
-    "en": [
-        ("Auto — by the amount of VRAM", settings_module.MEMORY_AUTO),
-        ("High — 20 GB and more: models take turns on the card", settings_module.MEMORY_HIGH),
-        ("Low — 6–16 GB: INT8 encoder layer by layer, KV cache in RAM", settings_module.MEMORY_LOW),
-    ],
-}
+
+def profile_choices(lang: str, vram_gib: float | None) -> list[tuple[str, str]]:
+    """Профили памяти словами; у «Авто» — во что он превратится на этой карте."""
+    index = 0 if lang == "ru" else 1
+    cards = _PROFILE_CARDS[settings_module.resolve_profile(settings_module.MEMORY_AUTO, vram_gib)][index]
+    resolved = cards[0].lower() + cards[1:]
+    auto = f"Авто — по видеокарте (сейчас: {resolved})" if lang == "ru" else f"Auto — by the video card (now: {resolved})"
+    return [(auto, settings_module.MEMORY_AUTO)] + [
+        (f"{_PROFILE_CARDS[name][index]} — {_PROFILE_HOW[name][index]}", name)
+        for name in (settings_module.MEMORY_HIGH, settings_module.MEMORY_LOW)
+    ]
+
 
 _PROMPT_FILES: tuple[str, ...] = (
     "system_prompt_t2i.txt",
@@ -215,15 +219,20 @@ def build(studio, localizer: Localizer, language=None) -> dict:
             # отдельная кнопка, а не мгновенная реакция на выбор; внимание
             # переключается на лету.
             chosen = settings_module.load()
-            # Список, а не радиокнопки: вариантов восемь.
+            vram = hardware.vram_gib()
+            # Столбцом, а не выпадающим списком: восемь вариантов различаются
+            # ценой, и сравнивать их удобнее, когда видны все сразу.
             precision = localizer.bind(
-                gr.Dropdown(
-                    choices=_PRECISION_CHOICES[lang],
+                gr.Radio(
+                    choices=precision_choices(lang, vram),
                     value=chosen.precision,
                     label=pick("perf_precision", lang),
+                    info=pick("perf_precision_info", lang),
+                    elem_classes=[layout.CHOICES],
                 ),
-                label=("Точность трансформера", "Transformer precision"),
-                choices=(_PRECISION_CHOICES["ru"], _PRECISION_CHOICES["en"]),
+                label=T["perf_precision"],
+                info=T["perf_precision_info"],
+                choices=(precision_choices("ru", vram), precision_choices("en", vram)),
             )
             apply_precision_button = localizer.bind(
                 gr.Button(pick("perf_apply", lang)), value=("Применить точность", "Apply precision")
@@ -232,12 +241,13 @@ def build(studio, localizer: Localizer, language=None) -> dict:
             # и точность, меняется перезагрузкой модели, поэтому — кнопкой.
             memory_profile = localizer.bind(
                 gr.Radio(
-                    choices=_PROFILE_CHOICES[lang],
+                    choices=profile_choices(lang, vram),
                     value=chosen.memory_profile,
                     label=pick("perf_profile", lang),
+                    elem_classes=[layout.CHOICES],
                 ),
-                label=("Профиль памяти", "Memory profile"),
-                choices=(_PROFILE_CHOICES["ru"], _PROFILE_CHOICES["en"]),
+                label=T["perf_profile"],
+                choices=(profile_choices("ru", vram), profile_choices("en", vram)),
             )
             apply_profile_button = localizer.bind(
                 gr.Button(pick("perf_profile_apply", lang)), value=("Применить профиль", "Apply profile")

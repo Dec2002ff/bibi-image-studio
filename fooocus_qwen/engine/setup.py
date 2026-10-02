@@ -72,8 +72,8 @@ def configure(
     out("  Transformer weight precision:")
     options = list(settings_module.PRECISIONS)
     for number, name in enumerate(options, start=1):
-        mark = "  <- recommended for this card" if name == recommended else ""
-        out(f"    {number} - {_PRECISION_TEXT[name]}{mark}")
+        label = settings_module.precision_label(name, "en", recommended=name == recommended)
+        out(f"    {number} - {label.translate(_ASCII)}")
     default = str(options.index(known) + 1)
     answer = ask(f"  Choice (Enter = {default}): ").strip() or default
     if answer.isdigit() and 1 <= int(answer) <= len(options):
@@ -98,16 +98,8 @@ def configure(
     return chosen
 
 
-_PRECISION_TEXT = {
-    "bf16": "bf16: original precision, 13.3 GiB VRAM, ~33 GB of weights (24 GB cards)",
-    "int8": "INT8: 6.8 GiB VRAM, nearly the same speed, ~26 GB of weights (12-24 GB cards)",
-    "Q8_0": "GGUF Q8_0: 6.6 GiB VRAM, closest to bf16 (10-16 GB cards)",
-    "Q6_K": "GGUF Q6_K: 5.4 GiB VRAM (10-12 GB cards)",
-    "Q5_K_M": "GGUF Q5_K_M: 4.7 GiB VRAM (8-10 GB cards, tight on 8)",
-    "Q4_K_M": "GGUF Q4_K_M: 3.9 GiB VRAM, the choice for 6-8 GB cards",
-    "Q4_K_S": "GGUF Q4_K_S: 3.4 GiB VRAM, fallback if Q4_K_M runs out of memory",
-    "Q3_K_M": "GGUF Q3_K_M: 2.7 GiB VRAM, visible quality loss; last resort",
-}
+# Консоль установки может быть не в UTF-8: типографские знаки подписи — в ASCII.
+_ASCII = str.maketrans({"–": "-", "—": "-", "·": "|", "←": "<-"})
 
 
 def install_sage_attention(out: Callable[..., None] = print, python: str | None = None) -> bool:
