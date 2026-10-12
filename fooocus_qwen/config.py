@@ -56,7 +56,7 @@ class AppConfig:
 
     host: str = DEFAULT_HOST
     port: int = DEFAULT_PORT
-    lang: str = "en"
+    lang: str = "ru"
     pin_memory: bool = True
     preload: bool = True
     preset: str = "MiddleQuality"
@@ -85,7 +85,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fooocus_qwen", description="Qwen-Image-2.1 web UI")
     parser.add_argument("--host", default=DEFAULT_HOST, help="address to listen on")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="port to listen on")
-    parser.add_argument("--lang", choices=("en", "ru"), default="en", help="interface language")
+    parser.add_argument("--lang", choices=("en", "ru"), default="ru", help="interface language")
     parser.add_argument("--preset", choices=PRESET_NAMES, default="MiddleQuality", help="quality preset")
     parser.add_argument("--verbose", action="store_true", help="verbose logging")
     # Закрепление памяти ускоряет переброску весов, но занимает десятки гигабайт
