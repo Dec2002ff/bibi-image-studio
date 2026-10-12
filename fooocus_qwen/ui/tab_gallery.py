@@ -187,29 +187,29 @@ def build(
                     buttons=layout.GALLERY_BUTTONS,
                     value=[str(path) for path in gallery.recent(config.OUTPUT_DIR)],
                 ),
-                label=("Галерея", "Gallery"),
+                label=("图库", "갤러리"),
             )
         with gr.Column(min_width=layout.SIDE_MIN_WIDTH, elem_classes=[layout.SIDE_COL]):
             details = gr.Markdown(say("gallery_pick", lang), elem_classes=[layout.CARD])
             with gr.Row():
                 reuse = localizer.bind(
                     gr.Button(pick("gallery_reuse", lang), variant="primary"),
-                    value=("Повторить параметры", "Reuse parameters"),
+                    value=("复用参数", "파라미터 재사용"),
                 )
                 to_editor = localizer.bind(
                     gr.Button(pick("gallery_to_editor", lang), visible=edit_components is not None),
-                    value=("Открыть в редакторе", "Open in editor"),
+                    value=("在编辑器中打开", "편집기에서 열기"),
                 )
             # Восстановление из файла — одна кнопка: выбрал PNG, и параметры
             # уже во вкладке генерации. Раньше это были поле загрузки и
             # отдельная кнопка с той же подписью, что сбивало с толку.
             from_file = localizer.bind(
                 gr.UploadButton(pick("gallery_from_file", lang), file_types=[".png"], size="sm"),
-                label=("Параметры из PNG-файла…", "Parameters from a PNG file…"),
+                label=("从 PNG 读取参数…", "PNG에서 파라미터 불러오기…"),
             )
             open_button = localizer.bind(
                 gr.Button(pick("open_folder", lang), size="sm"),
-                value=("Открыть папку", "Open folder"),
+                value=("打开文件夹", "폴더 열기"),
             )
             status = gr.Markdown("", elem_classes=[layout.STATUS])
 
