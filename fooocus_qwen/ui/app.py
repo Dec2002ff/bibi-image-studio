@@ -89,7 +89,11 @@ def build(cfg: config.AppConfig, return_studio: bool = False):
         # вкладок и без собственной высоты (позиционирование в style.css).
         language = gr.State(cfg.lang)
         language_button = gr.Button(
-            cfg.lang.upper(), size="sm", elem_classes=[layout.LANG], scale=0, min_width=0
+            {"ru": "中", "en": "한"}.get(cfg.lang, "中"),
+            size="sm",
+            elem_classes=[layout.LANG],
+            scale=0,
+            min_width=0,
         )
 
         def switch_language(current: str) -> list:
@@ -115,7 +119,11 @@ def build(cfg: config.AppConfig, return_studio: bool = False):
             """
             order = list(LANGUAGES)
             following = order[(order.index(current) + 1) % len(order)] if current in order else order[0]
-            return [following, gr.update(value=following.upper()), *localizer.updates(following)]
+            return [
+                following,
+                gr.update(value={"ru": "中", "en": "한"}.get(following, "中")),
+                *localizer.updates(following),
+            ]
 
 
         with gr.Tabs() as tabs:
@@ -124,14 +132,14 @@ def build(cfg: config.AppConfig, return_studio: bool = False):
             # запуска и не откликался бы на переключатель RU/EN.
             generate_tab = localizer.bind(
                 gr.Tab(pick("tab_generate", cfg.lang), id=layout.TAB_GENERATE),
-                label=("Генерация", "Generate"),
+                label=("生成", "생성"),
             )
             with generate_tab:
                 generate_components = tab_generate.build(studio, localizer, language)
 
             edit_tab = localizer.bind(
                 gr.Tab(pick("tab_edit", cfg.lang), id=layout.TAB_EDIT),
-                label=("Редактирование", "Edit"),
+                label=("编辑", "편집"),
             )
             with edit_tab:
                 edit_components = tab_edit.build(studio, localizer, language)
@@ -160,7 +168,7 @@ def build(cfg: config.AppConfig, return_studio: bool = False):
 
             gallery_tab = localizer.bind(
                 gr.Tab(pick("tab_gallery", cfg.lang), id=layout.TAB_GALLERY),
-                label=("Галерея", "Gallery"),
+                label=("图库", "갤러리"),
             )
             with gallery_tab:
                 gallery_components = tab_gallery.build(
@@ -179,7 +187,7 @@ def build(cfg: config.AppConfig, return_studio: bool = False):
 
             settings_tab = localizer.bind(
                 gr.Tab(pick("tab_settings", cfg.lang), id=layout.TAB_SETTINGS),
-                label=("Настройки", "Settings"),
+                label=("设置", "설정"),
             )
             with settings_tab:
                 settings_components = tab_settings.build(studio, localizer, language)
