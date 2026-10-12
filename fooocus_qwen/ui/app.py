@@ -65,6 +65,18 @@ def build(cfg: config.AppConfig, return_studio: bool = False):
         # каталог загрузок Gradio, и без уборки он рос бы с каждой правкой.
         delete_cache=(3600, 86400),
     ) as demo:
+        gr.HTML(
+            """
+            <div class="bibi-header">
+                <div class="bibi-brand">
+                    <span class="bibi-brand-name">Bibi Image Studio</span>
+                    <span class="bibi-brand-star">✦</span>
+                    <span class="bibi-brand-sub">Qwen Image Studio</span>
+                </div>
+                <div class="bibi-header-tagline">GOTHIC CREATIVE LAB · 고딕 크리에이티브 랩</div>
+            </div>
+            """
+        )
         # Заголовка на странице нет намеренно. Название приложения стоит в
         # заголовке окна браузера (`title=` у Blocks), и повторять его строкой
         # в сто пикселей высотой, которую пользователь читает один раз в
