@@ -9,7 +9,7 @@ from pathlib import Path
 import gradio as gr
 
 from .. import config
-from . import gradio_fixes, layout, reference_tools, tab_edit, tab_gallery, tab_generate, tab_settings, viewer
+from . import gradio_fixes, layout, reference_tools, tab_edit, tab_gallery, tab_generate, tab_inspiration, tab_settings, viewer
 from .i18n import LANGUAGES, Localizer, pick
 from .state import Studio
 
@@ -136,6 +136,25 @@ def build(cfg: config.AppConfig, return_studio: bool = False):
             )
             with generate_tab:
                 generate_components = tab_generate.build(studio, localizer, language)
+
+            inspiration_tab = localizer.bind(
+                gr.Tab(pick("tab_inspiration", cfg.lang), id=layout.TAB_INSPIRATION),
+                label=("灵感百科", "영감 도감"),
+            )
+            with inspiration_tab:
+                inspiration_components = tab_inspiration.build(localizer, language)
+
+            inspiration_components["apply"].click(
+                lambda prompt_text: prompt_text,
+                inspiration_components["prompt"],
+                generate_components["prompt"],
+                queue=False,
+            ).then(
+                lambda: gr.Tabs(selected=layout.TAB_GENERATE),
+                None,
+                tabs,
+                queue=False,
+            )
 
             edit_tab = localizer.bind(
                 gr.Tab(pick("tab_edit", cfg.lang), id=layout.TAB_EDIT),
