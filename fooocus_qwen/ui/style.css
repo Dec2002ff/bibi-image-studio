@@ -870,3 +870,119 @@ body,
         display: none;
     }
 }
+
+
+/* --- Bibi Inspiration Atlas --------------------------------------------- */
+.bibi-atlas-intro {
+    margin: 4px 0 14px;
+    padding: 18px 20px;
+    border: 1px solid var(--bibi-border);
+    border-radius: 18px;
+    background:
+        radial-gradient(circle at 88% 18%, rgba(98, 45, 79, .22), transparent 22rem),
+        linear-gradient(135deg, rgba(45, 31, 47, .96), rgba(21, 17, 24, .96));
+    box-shadow: 0 12px 32px rgba(0,0,0,.20);
+    position: relative;
+    overflow: hidden;
+}
+
+.bibi-atlas-intro::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0;
+    height: 14px;
+    opacity: .42;
+    background:
+        radial-gradient(12px 8px at 12px 0, transparent 9px, rgba(183, 128, 155, .40) 10px 11px, transparent 12px)
+        0 0 / 24px 12px repeat-x;
+}
+
+.bibi-atlas-kicker {
+    color: #9f7d91;
+    font-size: 10px;
+    letter-spacing: .24em;
+    margin-bottom: 5px;
+}
+
+.bibi-atlas-title {
+    font-family: Georgia, "Times New Roman", "Noto Serif SC", "Noto Serif KR", serif;
+    color: #eee1e8;
+    font-size: clamp(24px, 2.2vw, 34px);
+    line-height: 1.15;
+}
+
+.bibi-atlas-title span {
+    color: #8e526b;
+    padding: 0 5px;
+}
+
+.bibi-atlas-desc {
+    margin-top: 8px;
+    color: #a99ba5;
+    font-size: 13px;
+}
+
+.bibi-atlas-grid {
+    align-items: stretch !important;
+    gap: 12px !important;
+}
+
+.bibi-atlas-card {
+    min-width: 300px !important;
+    padding: 10px !important;
+    border: 1px solid var(--bibi-border) !important;
+    border-radius: 18px !important;
+    background:
+        linear-gradient(180deg, rgba(31, 24, 33, .92), rgba(20, 16, 23, .94)) !important;
+    box-shadow: 0 12px 30px rgba(0,0,0,.18);
+}
+
+/* Checkbox choices become compact "inspiration chips". */
+.bibi-atlas-card label {
+    border-radius: 999px !important;
+}
+
+.bibi-atlas-card input[type="checkbox"] + span,
+.bibi-atlas-card input[type="checkbox"] ~ span {
+    color: #d9cbd3 !important;
+}
+
+.bibi-atlas-card label:has(input[type="checkbox"]:checked) {
+    border-color: rgba(184, 104, 138, .48) !important;
+    background:
+        linear-gradient(135deg, rgba(99, 39, 64, .54), rgba(70, 42, 72, .42)) !important;
+    box-shadow: inset 0 0 0 1px rgba(212, 153, 178, .08) !important;
+}
+
+.bibi-atlas-prompt textarea {
+    min-height: 11rem !important;
+    line-height: 1.55 !important;
+}
+
+.bibi-atlas-apply {
+    min-height: 46px !important;
+}
+
+/* Tiny leopard accent only on the atlas action area, never as a loud page fill. */
+.bibi-atlas-apply::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    opacity: .055;
+    background:
+        radial-gradient(ellipse at center, #d5a373 0 16%, transparent 18%) 0 0/34px 24px,
+        radial-gradient(ellipse at center, #8e5f45 0 12%, transparent 14%) 16px 10px/42px 28px;
+}
+
+@media (max-width: 1100px) {
+    .bibi-atlas-grid {
+        flex-direction: column !important;
+    }
+
+    .bibi-atlas-card {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+}
