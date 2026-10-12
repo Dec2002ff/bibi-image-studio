@@ -570,3 +570,303 @@ footer { display: none !important; }
     height: clamp(12rem, calc(100vh - 32rem), 70rem) !important;
     max-height: none !important;
 }
+
+
+/* ==========================================================================
+   Bibi Image Studio — Gothic Lace UI
+   Dark plum / wine / black, with restrained lace and leopard accents.
+   ========================================================================== */
+
+:root {
+    --bibi-bg: #100d12;
+    --bibi-bg-soft: #171219;
+    --bibi-panel: rgba(30, 23, 32, 0.94);
+    --bibi-panel-2: rgba(38, 28, 40, 0.94);
+    --bibi-input: #211922;
+    --bibi-text: #f0e7ec;
+    --bibi-muted: #aa9ca6;
+    --bibi-wine: #64263f;
+    --bibi-wine-deep: #3d1728;
+    --bibi-plum: #4a3157;
+    --bibi-purple: #6e567c;
+    --bibi-rose: #a95f79;
+    --bibi-rose-soft: #c48ca1;
+    --bibi-danger: #7f3345;
+    --bibi-border: rgba(204, 170, 190, 0.18);
+    --bibi-border-strong: rgba(204, 170, 190, 0.34);
+    --bibi-radius: 16px;
+    --bibi-radius-lg: 22px;
+    --bibi-shadow: 0 18px 45px rgba(0, 0, 0, 0.34);
+}
+
+/* Page shell */
+html,
+body,
+.gradio-container {
+    background:
+        radial-gradient(circle at 18% -5%, rgba(87, 43, 72, 0.22), transparent 32rem),
+        radial-gradient(circle at 90% 8%, rgba(74, 32, 53, 0.18), transparent 27rem),
+        linear-gradient(180deg, #0c090d 0%, var(--bibi-bg) 44%, #0d0a0f 100%) !important;
+    color: var(--bibi-text) !important;
+}
+
+.gradio-container {
+    position: relative !important;
+    isolation: isolate;
+}
+
+/* Subtle gothic lace band — decorative only, intentionally low contrast. */
+.gradio-container::before {
+    content: "";
+    position: fixed;
+    inset: 0 0 auto 0;
+    height: 86px;
+    z-index: -1;
+    pointer-events: none;
+    opacity: .25;
+    background:
+        radial-gradient(circle at 12px 15px, transparent 0 8px, rgba(142, 93, 122, .30) 9px 10px, transparent 11px),
+        radial-gradient(circle at 36px 14px, transparent 0 9px, rgba(125, 76, 109, .24) 10px 11px, transparent 12px),
+        repeating-linear-gradient(90deg, transparent 0 24px, rgba(113, 70, 100, .15) 25px 27px, transparent 28px 48px);
+    background-size: 48px 38px, 48px 38px, 96px 38px;
+    mask-image: linear-gradient(to bottom, #000 0 55%, transparent 100%);
+}
+
+/* Bibi masthead */
+.bibi-header {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    min-height: 64px;
+    padding: 10px 104px 10px 18px;
+    margin: 2px 0 8px;
+    overflow: hidden;
+    border: 1px solid var(--bibi-border);
+    border-radius: 18px;
+    background:
+        linear-gradient(110deg, rgba(77, 31, 51, .38), transparent 30%),
+        linear-gradient(180deg, rgba(30, 22, 31, .96), rgba(18, 14, 20, .94));
+    box-shadow: 0 13px 40px rgba(0,0,0,.22);
+}
+
+.bibi-header::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 12px;
+    opacity: .45;
+    background:
+        radial-gradient(12px 8px at 12px 0, transparent 9px, rgba(185,135,160,.42) 10px 11px, transparent 12px)
+        0 0 / 24px 12px repeat-x;
+}
+
+.bibi-header::after {
+    content: "";
+    position: absolute;
+    top: -20px;
+    right: 58px;
+    width: 180px;
+    height: 100px;
+    opacity: .10;
+    transform: rotate(-6deg);
+    background:
+        radial-gradient(ellipse at center, #9b6a47 0 15%, transparent 17%) 0 0/42px 28px,
+        radial-gradient(ellipse at center, #6c4130 0 12%, transparent 14%) 20px 14px/48px 32px;
+}
+
+.bibi-brand {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+}
+
+.bibi-brand-name {
+    font-family: Georgia, "Times New Roman", "Noto Serif SC", "Noto Serif KR", serif;
+    font-size: clamp(22px, 2vw, 31px);
+    font-weight: 600;
+    letter-spacing: .2px;
+    color: #ead7df;
+    text-shadow: 0 0 18px rgba(146, 79, 112, .28);
+}
+
+.bibi-brand-star {
+    color: #b7748d;
+    font-size: 19px;
+}
+
+.bibi-brand-sub,
+.bibi-header-tagline {
+    color: var(--bibi-muted);
+    font-size: 11px;
+    letter-spacing: .13em;
+}
+
+.bibi-header-tagline {
+    position: relative;
+    z-index: 1;
+    text-align: right;
+}
+
+/* Main panels */
+.gradio-container .block,
+.gradio-container .form {
+    border-color: var(--bibi-border) !important;
+}
+
+.gradio-container .block {
+    background: linear-gradient(180deg, rgba(34, 27, 36, .94), rgba(25, 20, 28, .94)) !important;
+    border-radius: var(--bibi-radius) !important;
+}
+
+.qs-board,
+.qs-card,
+.qs-modalbox {
+    background:
+        linear-gradient(145deg, rgba(37, 28, 39, .97), rgba(20, 16, 23, .98)) !important;
+    border: 1px solid var(--bibi-border) !important;
+    border-radius: var(--bibi-radius-lg) !important;
+    box-shadow: var(--bibi-shadow) !important;
+}
+
+/* Tabs */
+.gradio-container button[role="tab"] {
+    position: relative;
+    color: #b7a9b3 !important;
+    border: 0 !important;
+    border-radius: 12px 12px 4px 4px !important;
+    background: transparent !important;
+    transition: color .18s ease, background .18s ease, box-shadow .18s ease !important;
+}
+
+.gradio-container button[role="tab"]:hover {
+    color: #e7d8e0 !important;
+    background: rgba(78, 45, 66, .24) !important;
+}
+
+.gradio-container button[role="tab"][aria-selected="true"] {
+    color: #f1e5eb !important;
+    background: linear-gradient(180deg, rgba(100, 38, 63, .58), rgba(59, 27, 47, .36)) !important;
+    box-shadow: inset 0 -2px 0 #a65c78, 0 8px 20px rgba(65, 24, 45, .18) !important;
+}
+
+/* Inputs */
+.gradio-container textarea,
+.gradio-container input,
+.gradio-container select {
+    background: var(--bibi-input) !important;
+    color: var(--bibi-text) !important;
+    border-color: var(--bibi-border) !important;
+    border-radius: 12px !important;
+}
+
+.gradio-container textarea:focus,
+.gradio-container input:focus {
+    border-color: var(--bibi-border-strong) !important;
+    box-shadow: 0 0 0 2px rgba(132, 74, 106, .14) !important;
+}
+
+/* Buttons — muted, never neon. */
+.gradio-container button {
+    border-radius: 12px !important;
+    border-color: var(--bibi-border) !important;
+    transition: transform .16s ease, box-shadow .16s ease, background .16s ease !important;
+}
+
+.gradio-container button:hover {
+    transform: translateY(-1px);
+}
+
+.gradio-container button.primary {
+    color: #f5eaf0 !important;
+    border-color: rgba(189, 112, 143, .45) !important;
+    background:
+        linear-gradient(135deg, #6c2945, #4d2444 55%, #382139) !important;
+    box-shadow: 0 8px 24px rgba(75, 24, 50, .30) !important;
+}
+
+.gradio-container button.primary:hover {
+    background:
+        linear-gradient(135deg, #77304d, #59304f 55%, #422743) !important;
+}
+
+.gradio-container button.stop {
+    color: #e8cfd8 !important;
+    background: linear-gradient(135deg, #552433, #3c1c27) !important;
+    border-color: rgba(145, 66, 89, .42) !important;
+}
+
+/* Reference cards */
+.qs-refslot {
+    overflow: hidden !important;
+    border-radius: 12px !important;
+    border: 1px solid rgba(188, 151, 172, .20) !important;
+    background:
+        linear-gradient(145deg, rgba(51, 38, 51, .96), rgba(30, 24, 32, .96)) !important;
+}
+
+.qs-refslot:hover {
+    border-color: rgba(190, 124, 155, .42) !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,.20) !important;
+}
+
+/* Status / muted copy */
+.qs-status,
+.gradio-container .info,
+.gradio-container .secondary-wrap {
+    color: var(--bibi-muted) !important;
+}
+
+/* Language pill */
+.qs-lang {
+    top: 18px !important;
+    right: 28px !important;
+    min-width: 54px !important;
+    padding: 5px 13px !important;
+    color: #e7dbe2 !important;
+    background: rgba(45, 34, 47, .90) !important;
+    border: 1px solid var(--bibi-border-strong) !important;
+    border-radius: 999px !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,.20) !important;
+}
+
+/* Scrollbars */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #5b4458 #151117;
+}
+
+::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+}
+
+::-webkit-scrollbar-track {
+    background: #151117;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(#5b4458, #462f45);
+    border-radius: 999px;
+}
+
+/* Mobile */
+@media (max-width: 720px) {
+    .bibi-header {
+        padding-right: 14px;
+        align-items: flex-start;
+        flex-direction: column;
+    }
+    .bibi-header-tagline {
+        text-align: left;
+        font-size: 10px;
+    }
+    .bibi-brand-sub {
+        display: none;
+    }
+}
