@@ -543,6 +543,7 @@ MESSAGES: dict[str, tuple[str, str]] = {
 T.update({
     "app_title": ("Bibi Image Studio", "Bibi Image Studio"),
     "tab_generate": ("生成", "생성"),
+    "tab_inspiration": ("灵感百科", "영감 도감"),
     "tab_edit": ("编辑", "편집"),
     "tab_gallery": ("图库", "갤러리"),
     "tab_settings": ("设置", "설정"),
@@ -603,6 +604,14 @@ T.update({
     "perf_sage": ("SageAttention", "SageAttention"),
     "memory": ("显存", "GPU 메모리"),
     "refresh": ("刷新", "새로고침"),
+    "inspiration_roles": ("角色与生物", "캐릭터 · 생물"),
+    "inspiration_angles": ("视角与朝向", "시점 · 방향"),
+    "inspiration_scenes": ("场景", "장면"),
+    "inspiration_plants": ("植物", "식물"),
+    "inspiration_styles": ("风格与表现", "스타일 · 표현"),
+    "inspiration_current": ("当前提示词组合", "현재 프롬프트 조합"),
+    "inspiration_current_placeholder": ("选择灵感，也可以继续手动编辑。", "영감을 고른 뒤 직접 수정할 수 있어요."),
+    "inspiration_apply": ("✦ 加入生成", "✦ 생성에 적용"),
 })
 
 MESSAGES.update({
