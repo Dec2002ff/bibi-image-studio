@@ -34,13 +34,7 @@ _NOTES: dict[str, tuple[str, str]] = {
 
 
 def _steps(count: int, lang: str) -> str:
-    if lang != "ru":
-        return f"{count} 스텝"
-    return f"{count} 步"
-    tail = count % 100
-    if 11 <= tail <= 14 or count % 10 in (0, 5, 6, 7, 8, 9):
-        return f"{count} шагов"
-    return f"{count} шаг" if count % 10 == 1 else f"{count} шага"
+    return f"{count} 步" if lang == "ru" else f"{count} 스텝"
 
 
 def label(name: str, lang: str) -> str:
