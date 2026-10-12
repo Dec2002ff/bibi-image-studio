@@ -146,8 +146,8 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     placeholder=pick("llm_address_placeholder", lang),
                     value=current.base_url if current else "",
                 ),
-                label=("Адрес сервера языковой модели", "Language model server address"),
-                placeholder=("192.168.1.10:8000 или https://…", "192.168.1.10:8000 or https://…"),
+                label=("语言模型服务器地址", "언어 모델 서버 주소"),
+                placeholder=("192.168.1.10:8000 或 https://…", "192.168.1.10:8000 또는 https://…"),
             )
             # Поле пароля и всегда пустое: сервер токен не показывает — ни
             # здесь, ни где-либо ещё в интерфейсе.
@@ -158,27 +158,27 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     type="password",
                     value="",
                 ),
-                label=("Токен", "Token"),
-                placeholder=("Пусто — оставить прежний", "Empty keeps the current one"),
+                label=("Token", "토큰"),
+                placeholder=("留空则保留当前 Token", "비워 두면 현재 토큰 유지"),
             )
             with gr.Row():
                 save_endpoint = localizer.bind(
-                    gr.Button(pick("save", lang)), value=("Сохранить", "Save")
+                    gr.Button(pick("save", lang)), value=("保存", "저장")
                 )
                 check = localizer.bind(
                     gr.Button(pick("llm_check", lang), variant="primary"),
-                    value=("Проверить связь", "Check connection"),
+                    value=("检查连接", "연결 확인"),
                 )
             forget = localizer.bind(
                 gr.Button(pick("llm_forget_token", lang), size="sm"),
-                value=("Убрать токен", "Remove the token"),
+                value=("移除 Token", "토큰 제거"),
             )
             endpoint_status = localizer.bind(
                 gr.Textbox(
                     label=pick("status", lang), interactive=False, lines=2,
                     value=describe_endpoint(lang),
                 ),
-                label=("Состояние", "Status"),
+                label=("状态", "상태"),
             )
 
         # Системный промт — единственное место вкладки, где ширина идёт в
@@ -192,7 +192,7 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     value=_PROMPT_FILES[0],
                     label=pick("sysprompt_select", lang),
                 ),
-                label=("Системный промт", "System prompt"),
+                label=("系统提示词", "시스템 프롬프트"),
                 choices=(ru_choices, en_choices),
             )
             prompt_text = gr.Textbox(
@@ -202,11 +202,11 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                 elem_classes=[layout.LONG_TEXT],
             )
             save_prompt_button = localizer.bind(
-                gr.Button(pick("save_prompt", lang)), value=("Сохранить промт", "Save prompt")
+                gr.Button(pick("save_prompt", lang)), value=("保存提示词", "프롬프트 저장")
             )
             prompt_status = localizer.bind(
                 gr.Textbox(label=pick("status", lang), interactive=False, lines=2),
-                label=("Состояние", "Status"),
+                label=("状态", "상태"),
             )
 
         # Память стояла отдельной строкой под обеими колонками и занимала
@@ -235,7 +235,7 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                 choices=(precision_choices("ru", vram), precision_choices("en", vram)),
             )
             apply_precision_button = localizer.bind(
-                gr.Button(pick("perf_apply", lang)), value=("Применить точность", "Apply precision")
+                gr.Button(pick("perf_apply", lang)), value=("应用精度", "정밀도 적용")
             )
             # Профиль памяти — раскладка весов (settings.MEMORY_PROFILES). Как
             # и точность, меняется перезагрузкой модели, поэтому — кнопкой.
@@ -250,7 +250,7 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                 choices=(profile_choices("ru", vram), profile_choices("en", vram)),
             )
             apply_profile_button = localizer.bind(
-                gr.Button(pick("perf_profile_apply", lang)), value=("Применить профиль", "Apply profile")
+                gr.Button(pick("perf_profile_apply", lang)), value=("应用显存模式", "VRAM 프로필 적용")
             )
             sage = localizer.bind(
                 gr.Checkbox(
@@ -259,14 +259,14 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     # Без пакета галочка ничего бы не включила — и не обещает.
                     interactive=attention.sage_available(),
                 ),
-                label=("SageAttention — быстрое внимание", "SageAttention — fast attention"),
+                label=("SageAttention — 加速注意力", "SageAttention — 빠른 어텐션"),
             )
             performance_status = localizer.bind(
                 gr.Textbox(
                     label=pick("status", lang), interactive=False, lines=2,
                     value=describe_performance(studio, lang),
                 ),
-                label=("Состояние", "Status"),
+                label=("状态", "상태"),
             )
 
             memory = localizer.bind(
@@ -276,7 +276,7 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     lines=2,
                     value=say("model_not_loaded", lang),
                 ),
-                label=("Память видеокарты", "GPU memory"),
+                label=("显存", "GPU 메모리"),
                 # Значение поля тоже переводимо: это заглушка «ещё не
                 # загружена», а не результат измерения. Переключение языка
                 # сбрасывает поле к ней — для снимка, который обновляют
@@ -285,7 +285,7 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                 value=MESSAGES["model_not_loaded"],
             )
             memory_refresh = localizer.bind(
-                gr.Button(pick("refresh", lang)), value=("Обновить", "Refresh")
+                gr.Button(pick("refresh", lang)), value=("刷新", "새로고침")
             )
 
     def store_endpoint(address_text, token_text, lang):
