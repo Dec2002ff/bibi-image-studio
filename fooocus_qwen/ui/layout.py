@@ -115,6 +115,7 @@ CARD = "qs-card"
 # Имена, по которым действия переключают вкладку сами: «Повторить
 # параметры» уводит на генерацию, «Открыть в редакторе» — на правку.
 TAB_GENERATE = "generate"
+TAB_INSPIRATION = "inspiration"
 TAB_EDIT = "edit"
 TAB_GALLERY = "gallery"
 TAB_SETTINGS = "settings"

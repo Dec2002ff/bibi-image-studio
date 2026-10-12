@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bibi-image-studio.local/schemas/style-profiles.schema.json",
+  "title": "Bibi Style Profiles",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "profiles"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "profiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "prompt_prefix": {
+            "type": "string"
+          },
+          "prompt_suffix": {
+            "type": "string"
+          },
+          "negative_prompt": {
+            "type": "string"
+          },
+          "reference_images": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "loras": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "defaults": {
+            "type": "object",
+            "properties": {
+              "aspect_ratio": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "quality": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "true_cfg_scale": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

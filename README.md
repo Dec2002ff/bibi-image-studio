@@ -1,4 +1,4 @@
-# Fooocus-Qwen-Image-2.1
+> **Bibi Image Studio fork:** active product work happens on the `bibi-foundation` branch. 中文说明见 [README.zh-CN.md](README.zh-CN.md).\n\n# Fooocus-Qwen-Image-2.1
 
 **English** · [Русский](README.ru.md)
 

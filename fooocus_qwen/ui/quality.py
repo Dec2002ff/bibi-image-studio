@@ -19,27 +19,22 @@ ORDER: tuple[str, ...] = ("TurboDraft", "Turbo", "Turbo4", "LowQuality", "Middle
 
 # (ru, en): как назвать и, если нужно, зачем выбирать.
 _TITLES: dict[str, tuple[str, str]] = {
-    "TurboDraft": ("Черновик", "Draft"),
+    "TurboDraft": ("草稿", "초안"),
     "Turbo": ("Turbo", "Turbo"),
     "Turbo4": ("Turbo4", "Turbo4"),
-    "LowQuality": ("Низкое", "Low"),
-    "MiddleQuality": ("Среднее", "Medium"),
-    "MaxQuality": ("Максимальное, 2K", "Maximum, 2K"),
+    "LowQuality": ("低", "낮음"),
+    "MiddleQuality": ("中", "중간"),
+    "MaxQuality": ("最高，2K", "최고, 2K"),
 }
 _NOTES: dict[str, tuple[str, str]] = {
-    "TurboDraft": ("для перебора промтов и сидов", "for trying prompts and seeds"),
-    "Turbo": ("быстрый дистиллят", "fast distilled model"),
-    "Turbo4": ("быстрее всего на 8 ГБ, правка слабее", "fastest on 8 GB, weaker at editing"),
+    "TurboDraft": ("用于快速尝试提示词和种子", "프롬프트와 시드 빠른 테스트용"),
+    "Turbo": ("快速蒸馏模型", "빠른 증류 모델"),
+    "Turbo4": ("8GB 显存下最快，编辑能力较弱", "8GB에서 가장 빠름, 편집 성능은 약함"),
 }
 
 
 def _steps(count: int, lang: str) -> str:
-    if lang != "ru":
-        return f"{count} steps"
-    tail = count % 100
-    if 11 <= tail <= 14 or count % 10 in (0, 5, 6, 7, 8, 9):
-        return f"{count} шагов"
-    return f"{count} шаг" if count % 10 == 1 else f"{count} шага"
+    return f"{count} 步" if lang == "ru" else f"{count} 스텝"
 
 
 def label(name: str, lang: str) -> str:
