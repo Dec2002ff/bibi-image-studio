@@ -45,26 +45,30 @@ def precision_choices(lang: str, vram_gib: float | None) -> list[tuple[str, str]
     ]
 
 
-# Профиль: (для каких карт, как раскладываются веса) — (ru, en).
+# VRAM profiles shown in the product languages.
 _PROFILE_CARDS = {
-    settings_module.MEMORY_HIGH: ("Для карт от 20 ГБ", "For 20 GB cards and up"),
-    settings_module.MEMORY_LOW: ("Для карт 6–16 ГБ", "For 6–16 GB cards"),
+    settings_module.MEMORY_HIGH: ("20GB 以上显存", "20GB 이상 VRAM"),
+    settings_module.MEMORY_LOW: ("6–16GB 显存", "6–16GB VRAM"),
 }
 _PROFILE_HOW = {
-    settings_module.MEMORY_HIGH: ("модели по очереди целиком на карте", "models take turns on the card whole"),
+    settings_module.MEMORY_HIGH: ("模型依次完整放入显卡", "모델을 번갈아 GPU에 전체 로드"),
     settings_module.MEMORY_LOW: (
-        "модель на карте, энкодер по слоям, кэш в ОЗУ",
-        "model on the card, encoder layer by layer, cache in RAM",
+        "主模型驻留显卡，编码器分层加载，缓存放在内存",
+        "주 모델은 GPU에 유지하고 인코더는 레이어별 로드, 캐시는 RAM 사용",
     ),
 }
 
 
 def profile_choices(lang: str, vram_gib: float | None) -> list[tuple[str, str]]:
-    """Профили памяти словами; у «Авто» — во что он превратится на этой карте."""
-    index = 0 if lang == "ru" else 1
-    cards = _PROFILE_CARDS[settings_module.resolve_profile(settings_module.MEMORY_AUTO, vram_gib)][index]
-    resolved = cards[0].lower() + cards[1:]
-    auto = f"Авто — по видеокарте (сейчас: {resolved})" if lang == "ru" else f"Auto — by the video card (now: {resolved})"
+    """VRAM profiles with a resolved Auto label for the current GPU."""
+    index = 0 if lang == "zh" else 1
+    resolved_name = settings_module.resolve_profile(settings_module.MEMORY_AUTO, vram_gib)
+    cards = _PROFILE_CARDS[resolved_name][index]
+    auto = (
+        f"自动 — 根据显卡选择（当前：{cards}）"
+        if lang == "zh"
+        else f"자동 — GPU에 맞게 선택 (현재: {cards})"
+    )
     return [(auto, settings_module.MEMORY_AUTO)] + [
         (f"{_PROFILE_CARDS[name][index]} — {_PROFILE_HOW[name][index]}", name)
         for name in (settings_module.MEMORY_HIGH, settings_module.MEMORY_LOW)
@@ -184,16 +188,16 @@ def build(studio, localizer: Localizer, language=None) -> dict:
         # Системный промт — единственное место вкладки, где ширина идёт в
         # дело: это абзацы текста, который правят руками.
         with gr.Column(min_width=layout.SIDE_MIN_WIDTH, elem_classes=[layout.TEXT_COL]):
-            ru_choices = [(pick(_PROMPT_KEYS[name], "ru"), name) for name in _PROMPT_FILES]
-            en_choices = [(pick(_PROMPT_KEYS[name], "en"), name) for name in _PROMPT_FILES]
+            zh_choices = [(pick(_PROMPT_KEYS[name], "zh"), name) for name in _PROMPT_FILES]
+            ko_choices = [(pick(_PROMPT_KEYS[name], "ko"), name) for name in _PROMPT_FILES]
             chosen_file = localizer.bind(
                 gr.Dropdown(
-                    choices=ru_choices if lang == "ru" else en_choices,
+                    choices=zh_choices if lang == "zh" else ko_choices,
                     value=_PROMPT_FILES[0],
                     label=pick("sysprompt_select", lang),
                 ),
                 label=("系统提示词", "시스템 프롬프트"),
-                choices=(ru_choices, en_choices),
+                choices=(zh_choices, ko_choices),
             )
             prompt_text = gr.Textbox(
                 lines=18,
@@ -232,7 +236,7 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                 ),
                 label=T["perf_precision"],
                 info=T["perf_precision_info"],
-                choices=(precision_choices("ru", vram), precision_choices("en", vram)),
+                choices=(precision_choices("zh", vram), precision_choices("ko", vram)),
             )
             apply_precision_button = localizer.bind(
                 gr.Button(pick("perf_apply", lang)), value=("应用精度", "정밀도 적용")
@@ -247,7 +251,7 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     elem_classes=[layout.CHOICES],
                 ),
                 label=T["perf_profile"],
-                choices=(profile_choices("ru", vram), profile_choices("en", vram)),
+                choices=(profile_choices("zh", vram), profile_choices("ko", vram)),
             )
             apply_profile_button = localizer.bind(
                 gr.Button(pick("perf_profile_apply", lang)), value=("应用显存模式", "VRAM 프로필 적용")
