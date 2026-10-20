@@ -195,8 +195,8 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     gr.Checkbox(label=pick("boost", lang), value=False, info=pick("boost_info", lang)),
                     label=("AI 提示词优化", "AI 프롬프트 최적화"),
                     info=(
-                        "Переписать промт внешней языковой моделью перед генерацией.",
-                        "Rewrite the prompt with an external language model before generating.",
+                        "生成前使用语言模型优化提示词。",
+                        "생성 전에 언어 모델로 프롬프트를 다듬습니다.",
                     ),
                 )
                 boost_now = localizer.bind(
