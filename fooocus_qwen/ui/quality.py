@@ -17,7 +17,7 @@ from ..engine import presets
 
 ORDER: tuple[str, ...] = ("TurboDraft", "Turbo", "Turbo4", "LowQuality", "MiddleQuality", "MaxQuality")
 
-# (ru, en): как назвать и, если нужно, зачем выбирать.
+# (zh, ko): как назвать и, если нужно, зачем выбирать.
 _TITLES: dict[str, tuple[str, str]] = {
     "TurboDraft": ("草稿", "초안"),
     "Turbo": ("Turbo", "Turbo"),
@@ -34,13 +34,13 @@ _NOTES: dict[str, tuple[str, str]] = {
 
 
 def _steps(count: int, lang: str) -> str:
-    return f"{count} 步" if lang == "ru" else f"{count} 스텝"
+    return f"{count} 步" if lang == "zh" else f"{count} 스텝"
 
 
 def label(name: str, lang: str) -> str:
     """«Среднее — 28 шагов, 1536 px»; у дистиллятов — ещё зачем."""
     preset = presets.get(name)
-    index = 0 if lang == "ru" else 1
+    index = 0 if lang == "zh" else 1
     text = f"{_TITLES[name][index]} — {_steps(preset.num_inference_steps, lang)}, {preset.output_resolution} px"
     note = _NOTES.get(name)
     return f"{text}; {note[index]}" if note else text
