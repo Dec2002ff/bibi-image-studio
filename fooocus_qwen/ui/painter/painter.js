@@ -35,10 +35,10 @@ const MIN_SIZE = 1;
 const MAX_SIZE = 600;
 const SYNC_DELAY_MS = 400;
 
-let lang = props.lang === 'en' ? 'en' : 'ru';
+let lang = props.lang === 'ko' ? 'ko' : 'zh';
 const say = key => {
     const pair = LABELS[key];
-    return pair ? pair[lang === 'en' ? 1 : 0] : key;
+    return pair ? pair[lang === 'ko' ? 1 : 0] : key;
 };
 
 /* --- разметка ------------------------------------------------------------ */
@@ -728,7 +728,7 @@ async function flush() {
 /* --- значение: сервер → кисть ---------------------------------------------- */
 
 function syncFromProps() {
-    const nextLang = props.lang === 'en' ? 'en' : 'ru';
+    const nextLang = props.lang === 'ko' ? 'ko' : 'zh';
     if (nextLang !== lang) { lang = nextLang; relabel(); }
     if ((props.region || 'mask') !== state.region) applyRegion(props.region);
 
