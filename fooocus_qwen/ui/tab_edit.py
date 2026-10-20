@@ -293,8 +293,8 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                 # пресетов, а переводимый текст из T; без этого поля переключатель
                 # языка обновил бы всё вокруг радиокнопок, но не их подписи.
                 choices=(
-                    [(pick(_MODE_KEYS[key], "ru"), key) for key in _MODE_KEYS],
-                    [(pick(_MODE_KEYS[key], "en"), key) for key in _MODE_KEYS],
+                    [(pick(_MODE_KEYS[key], "zh"), key) for key in _MODE_KEYS],
+                    [(pick(_MODE_KEYS[key], "ko"), key) for key in _MODE_KEYS],
                 ),
             )
             quality = localizer.bind(
@@ -303,7 +303,7 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     label=pick("quality", lang), elem_classes=[layout.CHOICES],
                 ),
                 label=T["quality"],
-                choices=(quality_choices.choices("ru"), quality_choices.choices("en")),
+                choices=(quality_choices.choices("zh"), quality_choices.choices("ko")),
             )
             status = localizer.bind(
                 gr.Textbox(
@@ -332,8 +332,8 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     ),
                     label=("保留蒙版外区域", "마스크 밖 픽셀 유지"),
                     info=(
-                        "Склеивает результат с оригиналом: вне маски пиксели остаются исходными.",
-                        "Blends the result with the original so pixels outside the mask stay untouched.",
+                        "将结果与原图合成，蒙版之外的像素保持原样。",
+                        "결과를 원본과 합성해 마스크 밖의 픽셀은 원본 그대로 유지합니다.",
                     ),
                 )
                 seed = localizer.bind(
