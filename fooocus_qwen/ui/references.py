@@ -181,7 +181,7 @@ def build_grid(localizer: Localizer, lang: str) -> Grid:
     # только загрузку: веб-камера и буфер обмена в поле в пару сантиметров
     # добавили бы панель переключения источников крупнее самой ячейки.
     with gr.Column(min_width=0, elem_classes=[layout.REFS_COL]):
-        localizer.bind(gr.Markdown(pick("references", lang)), value=("Референсы", "References"))
+        localizer.bind(gr.Markdown(pick("references", lang)), value=("参考图", "참고 이미지"))
         for _row in range(REFERENCE_ROWS):
             with gr.Row(equal_height=True, elem_classes=[layout.REF_ROW]):
                 for _column in range(REFERENCE_COLUMNS):
@@ -222,7 +222,7 @@ def build_grid(localizer: Localizer, lang: str) -> Grid:
                         tags.append(gr.Markdown(_NO_TAG, elem_classes=[layout.REF_TAG]))
         clear = localizer.bind(
             gr.Button(pick("reference_clear", lang), size="sm"),
-            value=("Очистить референсы", "Clear references"),
+            value=("清空参考图", "참고 이미지 비우기"),
         )
     return Grid(state, slots, tags, pose_buttons, sketch_buttons, clear)
 
