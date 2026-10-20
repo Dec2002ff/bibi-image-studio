@@ -41,7 +41,7 @@ from typing import Any
 
 import gradio as gr
 
-LANGUAGES = ("ru", "en")
+LANGUAGES = ("zh", "ko")
 
 T: dict[str, tuple[str, str]] = {
     "app_title": ("Qwen-Image-2.1 — студия", "Qwen-Image-2.1 Studio"),
@@ -222,8 +222,35 @@ PAINTER: dict[str, tuple[str, str]] = {
 }
 
 
+PAINTER.update({
+    "painter_brush": ("画笔 (B)", "브러시 (B)"),
+    "painter_eraser": ("橡皮擦 (E)；鼠标右键始终擦除", "지우개 (E); 마우스 오른쪽 버튼은 항상 지웁니다"),
+    "painter_size": ("大小", "크기"),
+    "painter_colour": ("自定义颜色", "사용자 색상"),
+    "painter_opacity": ("不透明度", "불투명도"),
+    "painter_undo": ("撤销 (Ctrl+Z)", "실행 취소 (Ctrl+Z)"),
+    "painter_redo": ("重做 (Ctrl+Y)", "다시 실행 (Ctrl+Y)"),
+    "painter_invert": ("反转标记", "표시 반전"),
+    "painter_clear": ("清除全部标记", "모든 표시 지우기"),
+    "painter_toggle": ("显示/隐藏标记 (H)", "표시 보이기/숨기기 (H)"),
+    "painter_fit": ("适应窗口 (F)", "화면에 맞추기 (F)"),
+    "painter_open": ("打开图片", "이미지 열기"),
+    "painter_remove": ("移除图片", "이미지 제거"),
+    "painter_stage": ("标记画布", "마킹 캔버스"),
+    "painter_empty_title": ("将图片拖到这里", "이미지를 여기로 드래그하세요"),
+    "painter_empty_hint": ("或点击选择文件；Ctrl+V 可从剪贴板粘贴", "또는 클릭해 파일을 선택하세요; Ctrl+V로 붙여넣을 수 있습니다"),
+    "painter_busy": ("加载中…", "불러오는 중…"),
+    "painter_hint": ("滚轮缩放 · 空格/中键平移 · Shift+滚轮或 [ ] 调整画笔大小 · X 切换画笔/橡皮擦",
+                     "휠 확대/축소 · 스페이스/중간 버튼 이동 · Shift+휠 또는 [ ] 브러시 크기 · X 브러시/지우개"),
+    "painter_not_image": ("这不是图片", "이미지 파일이 아닙니다"),
+    "painter_upload_failed": ("图片上传失败", "이미지 업로드 실패"),
+    "painter_load_failed": ("图片打开失败", "이미지를 열 수 없습니다"),
+    "painter_region_none": ("“无区域”模式会编辑整张图片，不使用标记", "‘영역 없음’ 모드는 전체 이미지를 편집하며 표시를 사용하지 않습니다"),
+})
+
+
 def painter_labels() -> dict[str, list[str]]:
-    """Тексты кисти в форме, которую ждёт клиентский скрипт: ключ → [ru, en]."""
+    """Labels used by the client painter, in [zh, ko] order."""
     return {key: list(pair) for key, pair in PAINTER.items()}
 
 
@@ -598,6 +625,10 @@ T.update({
     "llm_forget_token": ("移除 Token", "토큰 제거"),
     "sysprompt_select": ("系统提示词", "시스템 프롬프트"),
     "perf_precision": ("模型精度", "모델 정밀도"),
+    "perf_precision_info": ("列表越靠下，显存占用越小，但画质损失会更明显。", "목록 아래로 갈수록 VRAM 사용량은 줄지만 화질 손실은 더 눈에 띕니다."),
+    "sysprompt_t2i": ("文本 → 图片", "텍스트 → 이미지"),
+    "sysprompt_edit": ("图片编辑", "이미지 편집"),
+    "sysprompt_describe": ("图片描述", "이미지 설명"),
     "perf_apply": ("应用精度", "정밀도 적용"),
     "perf_profile": ("显存模式", "VRAM 프로필"),
     "perf_profile_apply": ("应用显存模式", "VRAM 프로필 적용"),
@@ -617,14 +648,99 @@ T.update({
 MESSAGES.update({
     "references_counted": ("参考图：{count} / {total}", "참고 이미지: {count} / {total}"),
     "caption_untagged": ("无需标签", "태그 불필요"),
+    "endpoint_not_configured": (
+        "尚未配置语言模型：除 AI 提示词优化和图片描述外，其余功能都可以正常使用。",
+        "언어 모델이 설정되지 않았습니다. AI 프롬프트 최적화와 이미지 설명을 제외한 기능은 정상적으로 사용할 수 있습니다.",
+    ),
+    "endpoint_current": ("当前：{url}，{token}。", "현재: {url}, {token}."),
+    "token_set": ("已设置 Token", "토큰 설정됨"),
+    "token_unset": ("未设置 Token", "토큰 없음"),
+    "endpoint_saved": ("服务器地址已保存。", "서버 주소를 저장했습니다."),
+    "endpoint_need_address": ("请输入服务器地址。", "서버 주소를 입력해 주세요."),
+    "endpoint_bad_address": ("无法识别服务器地址：{error}", "서버 주소를 인식할 수 없습니다: {error}"),
+    "token_forgotten": ("Token 已移除。", "토큰을 제거했습니다."),
+    "llm_no_connection": ("连接失败：{error}", "연결 실패: {error}"),
+    "llm_connected": ("连接成功。当前模型：{model}", "연결되었습니다. 선택된 모델: {model}"),
+    "llm_no_model_named": ("服务器未返回模型名称", "서버가 모델 이름을 반환하지 않음"),
+    "prompt_file_saved": ("已保存文件 {name}", "파일 {name}을 저장했습니다"),
+    "prompt_file_missing": (
+        "# 未找到文件 {name}。请运行 tools/fetch_system_prompts.py\n",
+        "# 파일 {name}을 찾을 수 없습니다. tools/fetch_system_prompts.py를 실행하세요\n",
+    ),
+    "model_not_loaded": ("模型尚未加载完成", "모델이 아직 로드되지 않았습니다"),
+    "memory_report": (
+        "显存：已占用 {allocated:.1f} GiB，已保留 {reserved:.1f} GiB；编码器换入换出：{swaps}；提示词缓存：命中 {hits} / 未命中 {misses}",
+        "GPU 메모리: {allocated:.1f} GiB 사용, {reserved:.1f} GiB 예약; 인코더 스왑: {swaps}; 프롬프트 캐시: 적중 {hits} / 미적중 {misses}",
+    ),
+    "perf_current": (
+        "精度：{precision}。显存模式：{profile}。Attention：{attention}。Turbo：{turbo}。",
+        "정밀도: {precision}. VRAM 프로필: {profile}. Attention: {attention}. Turbo: {turbo}.",
+    ),
+    "profile_unchanged": ("当前显存模式已经是这个选项。", "이미 선택된 VRAM 프로필입니다."),
+    "profile_switched": (
+        "显存模式已切换为 {profile}；模型将在后台重新加载。",
+        "VRAM 프로필을 {profile}(으)로 변경했습니다. 모델을 백그라운드에서 다시 로드합니다.",
+    ),
+    "perf_attention_native": ("默认", "기본"),
+    "perf_attention_missing": (
+        "默认（未安装 SageAttention）",
+        "기본 (SageAttention이 설치되지 않음)",
+    ),
+    "perf_turbo_ready": ("权重已就绪", "가중치 준비됨"),
+    "perf_turbo_later": ("首次使用该预设时下载权重", "해당 프리셋을 처음 사용할 때 가중치 다운로드"),
+    "precision_unchanged": ("当前已经使用该精度。", "이미 해당 정밀도를 사용 중입니다."),
+    "precision_downloading": ("正在下载所选精度的权重…", "선택한 정밀도의 가중치를 다운로드하는 중…"),
+    "precision_download_failed": (
+        "权重下载失败：{error}。精度未更改；重新尝试时只会下载缺失部分。",
+        "가중치 다운로드 실패: {error}. 정밀도는 변경되지 않았습니다. 다시 시도하면 누락된 부분만 다운로드합니다.",
+    ),
+    "precision_switched": (
+        "精度已切换为 {precision}；模型将在后台重新加载。",
+        "정밀도를 {precision}(으)로 변경했습니다. 모델을 백그라운드에서 다시 로드합니다.",
+    ),
+    "boost_failed": ("AI 提示词优化失败：{error}", "AI 프롬프트 최적화 실패: {error}"),
+    "boost_done": ("AI 提示词优化完成", "AI 프롬프트 최적화 완료"),
+    "describe_failed": ("图片描述失败：{error}", "이미지 설명 실패: {error}"),
+    "describe_done": ("图片描述完成", "이미지 설명 완료"),
+    "generation_interrupted": ("生成已停止", "생성을 중지했습니다"),
+    "edit_interrupted": ("编辑已停止", "편집을 중지했습니다"),
+    "parameters_not_found": ("这个文件里没有生成参数。", "이 파일에는 생성 파라미터가 없습니다."),
+    "opened_folder": ("已打开文件夹 {path}", "폴더를 열었습니다: {path}"),
+    "nothing_to_send": ("没有可发送的图片", "보낼 이미지가 없습니다"),
+    "sent_to_editor": ("已发送到编辑器", "편집기로 보냈습니다"),
 })
 
+def _normalise_lang(lang: str) -> str:
+    """Use real product language codes while accepting legacy aliases."""
+    if lang == "ru":
+        return "zh"
+    if lang == "en":
+        return "ko"
+    return lang if lang in LANGUAGES else "zh"
+
+
+def _select_pair(values: tuple[Any, Any], lang: str) -> Any:
+    """Select a zh/ko value and never surface leftover Russian UI text.
+
+    Older parts of the fork still carry legacy (ru, en) pairs. Until every
+    rare string is translated, Chinese mode falls back to the English half
+    instead of showing Russian. Korean mode also uses the second half.
+    """
+    current = _normalise_lang(lang)
+    if current == "ko":
+        return values[1]
+    first = values[0]
+    if isinstance(first, str) and any("\u0400" <= ch <= "\u04ff" for ch in first):
+        return values[1]
+    return first
+
+
 def pick(key: str, lang: str) -> str:
-    """Подпись компонента на нужном языке."""
+    """Return a UI label in Chinese or Korean."""
     entry = T.get(key)
     if entry is None:
         return key
-    return entry[0] if lang == "ru" else entry[1]
+    return _select_pair(entry, lang)
 
 
 def say(key: str, lang: str, **values: Any) -> str:
@@ -640,7 +756,7 @@ def say(key: str, lang: str, **values: Any) -> str:
     entry = MESSAGES.get(key)
     if entry is None:
         return key
-    template = entry[0] if lang == "ru" else entry[1]
+    template = _select_pair(entry, lang)
     return template.format(**values)
 
 
@@ -663,7 +779,7 @@ def sentences(*parts: str) -> str:
 class Localizer:
     """Запоминает переводимые поля компонентов и обновляет их разом."""
 
-    def __init__(self, default: str = "ru") -> None:
+    def __init__(self, default: str = "zh") -> None:
         self._default = default
         self._entries: list[tuple[Any, dict[str, tuple[str, str]]]] = []
 
@@ -691,8 +807,7 @@ class Localizer:
         return list(self._entries)
 
     def updates(self, lang: str) -> list[Any]:
-        index = 0 if lang == "ru" else 1
         return [
-            gr.update(**{name: values[index] for name, values in fields.items()})
+            gr.update(**{name: _select_pair(values, lang) for name, values in fields.items()})
             for _, fields in self._entries
         ]
