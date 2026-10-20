@@ -68,7 +68,7 @@ CATALOG: dict[str, list[tuple[tuple[str, str], str]]] = {
 
 
 def _choices(category: str, lang: str) -> list[tuple[str, str]]:
-    index = 0 if lang == "ru" else 1
+    index = 0 if lang == "zh" else 1
     return [(labels[index], prompt) for labels, prompt in CATALOG[category]]
 
 
@@ -104,7 +104,7 @@ def build(localizer: Localizer, language=None) -> dict:
                     label=pick("inspiration_roles", lang),
                 ),
                 label=("角色与生物", "캐릭터 · 생물"),
-                choices=(_choices("roles", "ru"), _choices("roles", "en")),
+                choices=(_choices("roles", "zh"), _choices("roles", "ko")),
             )
             angles = localizer.bind(
                 gr.CheckboxGroup(
@@ -112,7 +112,7 @@ def build(localizer: Localizer, language=None) -> dict:
                     label=pick("inspiration_angles", lang),
                 ),
                 label=("视角与朝向", "시점 · 방향"),
-                choices=(_choices("angles", "ru"), _choices("angles", "en")),
+                choices=(_choices("angles", "zh"), _choices("angles", "ko")),
             )
 
         with gr.Column(elem_classes=["bibi-atlas-card"]):
@@ -122,7 +122,7 @@ def build(localizer: Localizer, language=None) -> dict:
                     label=pick("inspiration_scenes", lang),
                 ),
                 label=("场景", "장면"),
-                choices=(_choices("scenes", "ru"), _choices("scenes", "en")),
+                choices=(_choices("scenes", "zh"), _choices("scenes", "ko")),
             )
             plants = localizer.bind(
                 gr.CheckboxGroup(
@@ -130,7 +130,7 @@ def build(localizer: Localizer, language=None) -> dict:
                     label=pick("inspiration_plants", lang),
                 ),
                 label=("植物", "식물"),
-                choices=(_choices("plants", "ru"), _choices("plants", "en")),
+                choices=(_choices("plants", "zh"), _choices("plants", "ko")),
             )
 
         with gr.Column(elem_classes=["bibi-atlas-card"]):
@@ -140,7 +140,7 @@ def build(localizer: Localizer, language=None) -> dict:
                     label=pick("inspiration_styles", lang),
                 ),
                 label=("风格与表现", "스타일 · 표현"),
-                choices=(_choices("styles", "ru"), _choices("styles", "en")),
+                choices=(_choices("styles", "zh"), _choices("styles", "ko")),
             )
 
             assembled = localizer.bind(
