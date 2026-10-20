@@ -220,7 +220,7 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                                 elem_id=PAINTER_ID,
                                 elem_classes=[layout.BOARD, layout.PAINTER],
                             ),
-                            lang=("ru", "en"),
+                            lang=("zh", "ko"),
                         )
 
                 with gr.Column(min_width=layout.CANVAS_MIN_WIDTH, elem_classes=[layout.SLOT_RESULT]):
