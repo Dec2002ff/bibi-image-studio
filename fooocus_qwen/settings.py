@@ -70,13 +70,37 @@ PRECISION_INFO: dict[str, PrecisionInfo] = {
 }
 
 
-def precision_label(precision: str, lang: str = "en", recommended: bool = False) -> str:
-    """Подпись варианта точности: что это, сколько видеопамяти, для каких карт.
+_PRECISION_NOTE_ZH = {
+    PRECISION_BF16: "原始权重，画质基准",
+    PRECISION_INT8: "几乎无损，速度基本相同",
+    "Q8_0": "最接近 bf16",
+    "Q6_K": "画质损失很轻微",
+    "Q5_K_M": "8GB 显存较紧张",
+    "Q4_K_M": "6–8GB 显存主力选择",
+    "Q4_K_S": "Q4_K_M 放不下时使用",
+    "Q3_K_M": "画质损失明显，仅作兜底",
+}
+_PRECISION_NOTE_KO = {
+    PRECISION_BF16: "원본 가중치, 화질 기준",
+    PRECISION_INT8: "거의 무손실, 속도는 비슷함",
+    "Q8_0": "bf16에 가장 가까움",
+    "Q6_K": "화질 손실이 매우 적음",
+    "Q5_K_M": "8GB VRAM에서는 빠듯함",
+    "Q4_K_M": "6–8GB VRAM의 주력 선택",
+    "Q4_K_S": "Q4_K_M이 들어가지 않을 때",
+    "Q3_K_M": "화질 손실이 큼, 최후 수단",
+}
 
-    ``recommended`` — пометка «подходит вашей карте»
-    (``recommended_precision``).
-    """
+
+def precision_label(precision: str, lang: str = "en", recommended: bool = False) -> str:
+    """Human-readable precision label for installer and UI."""
     info = PRECISION_INFO[precision]
+    if lang == "zh":
+        text = f"{info.title} — {_PRECISION_NOTE_ZH[precision]} · {info.vram_gib} GiB · 适合 {info.cards}GB 显存"
+        return text + (" ← 适合你的显卡" if recommended else "")
+    if lang == "ko":
+        text = f"{info.title} — {_PRECISION_NOTE_KO[precision]} · {info.vram_gib} GiB · {info.cards}GB VRAM용"
+        return text + (" ← 현재 GPU에 적합" if recommended else "")
     if lang == "ru":
         text = f"{info.title} — {info.note[0]} · {info.vram_gib} ГиБ · карты {info.cards} ГБ"
         return text + (" ← под вашу карту" if recommended else "")
