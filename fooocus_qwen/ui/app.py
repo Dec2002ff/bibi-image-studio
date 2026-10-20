@@ -89,7 +89,7 @@ def build(cfg: config.AppConfig, return_studio: bool = False):
         # вкладок и без собственной высоты (позиционирование в style.css).
         language = gr.State(cfg.lang)
         language_button = gr.Button(
-            {"ru": "中", "en": "한"}.get(cfg.lang, "中"),
+            {"zh": "中", "ko": "한"}.get(cfg.lang, "中"),
             size="sm",
             elem_classes=[layout.LANG],
             scale=0,
@@ -121,7 +121,7 @@ def build(cfg: config.AppConfig, return_studio: bool = False):
             following = order[(order.index(current) + 1) % len(order)] if current in order else order[0]
             return [
                 following,
-                gr.update(value={"ru": "中", "en": "한"}.get(following, "中")),
+                gr.update(value={"zh": "中", "ko": "한"}.get(following, "中")),
                 *localizer.updates(following),
             ]
 
