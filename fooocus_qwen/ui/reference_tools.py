@@ -280,7 +280,7 @@ def build(
                     with gr.Column():
                         edit_name = localizer.bind(
                             gr.Textbox(label=pick("pose_name", lang), max_lines=1),
-                            label=("Имя позы", "Pose name"),
+                            label=("姿势名称", "포즈 이름"),
                         )
                         with gr.Row():
                             save_name = localizer.bind(
@@ -343,7 +343,7 @@ def build(
             sketch_message = gr.Markdown(elem_classes=[layout.MODAL_MESSAGE])
             with gr.Row():
                 sketch_cancel = localizer.bind(
-                    gr.Button(pick("modal_cancel", lang)), value=("Отмена", "Cancel")
+                    gr.Button(pick("modal_cancel", lang)), value=("取消", "취소")
                 )
                 sketch_accept = localizer.bind(
                     gr.Button(pick("modal_accept", lang), variant="primary"), value=("确认", "확인")
