@@ -68,8 +68,8 @@ SKETCH_COLOURS: tuple[str, ...] = (
 # интерфейсе подсказки оставались русскими (найдено, когда английский стал
 # языком по умолчанию).
 TOOL_TITLES = {
-    layout.REF_POSE: ("Поза: выбрать из библиотеки или по фото", "Pose: pick from the library or from a photo"),
-    layout.REF_SKETCH: ("Эскиз: нарисовать от руки", "Sketch: draw by hand"),
+    layout.REF_POSE: ("姿势：从姿势库选择或上传照片", "포즈: 라이브러리에서 선택하거나 사진 업로드"),
+    layout.REF_SKETCH: ("草图：手绘参考", "스케치: 직접 그리기"),
 }
 TITLES_JS = """
 () => {
