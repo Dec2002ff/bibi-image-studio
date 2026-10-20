@@ -219,7 +219,7 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     elem_classes=[layout.CHOICES],
                 ),
                 label=T["quality"],
-                choices=(quality_choices.choices("ru"), quality_choices.choices("en")),
+                choices=(quality_choices.choices("zh"), quality_choices.choices("ko")),
             )
             ratio = localizer.bind(
                 gr.Dropdown(
@@ -232,7 +232,7 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                 # идентификаторы (см. докстринг _ratio_choices), поэтому, как и
                 # у mask_mode на вкладке редактирования, переводится и label, и
                 # choices.
-                choices=(_ratio_choices("ru"), _ratio_choices("en")),
+                choices=(_ratio_choices("zh"), _ratio_choices("ko")),
             )
             image_number = localizer.bind(
                 gr.Slider(1, 8, value=1, step=1, label=pick("image_number", lang)),
@@ -271,10 +271,8 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     ),
                     label=("Guidance 强度 (true_cfg_scale)", "Guidance 강도 (true_cfg_scale)"),
                     info=(
-                        "Модель рассчитана на работу без guidance. При значении 1.0 негативный "
-                        "промт и негативные части стилей в модель не попадают вовсе.",
-                        "The model is meant to be sampled without guidance. At 1.0 the negative "
-                        "prompt and the negative half of every style are not sent to the model at all.",
+                        "模型默认按无 guidance 方式采样。设为 1.0 时，反向提示词和风格中的负向部分不会送入模型。",
+                        "모델은 기본적으로 guidance 없이 샘플링하도록 설계되었습니다. 1.0에서는 네거티브 프롬프트와 스타일의 네거티브 부분을 모델에 전달하지 않습니다.",
                     ),
                 )
                 seed = localizer.bind(
@@ -297,14 +295,8 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     ),
                     label=("参考图细节", "참고 이미지 디테일"),
                     info=(
-                        "Разрешение, к которому приводятся референсы и исходник правки. "
-                        "Размер кадра от этого не меняется. «Авто» урезает масштаб при "
-                        "двух и более референсах: на полном пять референсов считаются "
-                        "тринадцать минут, на 512 — сорок секунд.",
-                        "The resolution condition images are scaled to. It does not change "
-                        "the frame size. “Auto” reduces the scale from two "
-                        "references up: at full scale five references take thirteen minutes "
-                        "per frame, at 512 — forty seconds.",
+                        "控制参考图和编辑原图送入模型时的细节分辨率，不会改变最终画面尺寸。多张参考图时建议使用“自动”或 512 以节省显存和时间。",
+                        "참고 이미지와 편집 원본이 모델에 들어갈 때의 디테일 해상도입니다. 최종 이미지 크기는 바뀌지 않습니다. 참고 이미지가 여러 장이면 ‘자동’ 또는 512를 권장합니다.",
                     ),
                 )
                 kv_cache = localizer.bind(
@@ -313,8 +305,8 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     ),
                     label=("KV 缓存", "KV 캐시"),
                     info=(
-                        "Ускоряет генерацию. Переключение меняет результат при том же сиде.",
-                        "Speeds generation up. Toggling it changes the result for the same seed.",
+                        "可加速生成；即使 Seed 相同，开关状态不同也可能得到不同结果。",
+                        "생성을 빠르게 할 수 있습니다. 같은 Seed라도 설정이 다르면 결과가 달라질 수 있습니다.",
                     ),
                 )
 
