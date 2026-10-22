@@ -220,7 +220,7 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                                 elem_id=PAINTER_ID,
                                 elem_classes=[layout.BOARD, layout.PAINTER],
                             ),
-                            lang=("ru", "en"),
+                            lang=("zh", "ko"),
                         )
 
                 with gr.Column(min_width=layout.CANVAS_MIN_WIDTH, elem_classes=[layout.SLOT_RESULT]):
@@ -238,18 +238,18 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                             buttons=layout.GALLERY_BUTTONS,
                             elem_classes=[layout.PREVIEW, layout.BOARD],
                         ),
-                        label=("Результат", "Result"),
+                        label=("编辑预览", "편집 미리보기"),
                     )
                     with gr.Row():
                         send_back = localizer.bind(
                             gr.Button(pick("send_to_edit", lang)),
-                            value=("Отправить в редактор", "Send to editor"),
+                            value=("发送到编辑器", "편집기로 보내기"),
                         )
                         # Связывается в app.py: кладёт результат в референсы
                         # вкладки генерации — продолжить работу с ним там.
                         send_to_refs = localizer.bind(
                             gr.Button(pick("send_to_references", lang)),
-                            value=("Отправить в референсы", "Send to references"),
+                            value=("作为参考图", "참고 이미지로 보내기"),
                         )
 
             with gr.Row(elem_classes=[layout.PROMPT_BAR, layout.SLOT_PROMPT]):
@@ -260,25 +260,25 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                         lines=3,
                         scale=8,
                     ),
-                    label=("Промт", "Prompt"),
-                    placeholder=("Опишите изображение…", "Describe the image…"),
+                    label=("提示词", "프롬프트"),
+                    placeholder=("描述你想修改的内容……", "수정하고 싶은 내용을 설명해 주세요…"),
                 )
                 with gr.Column(scale=1, min_width=140):
                     run_button = localizer.bind(
                         gr.Button(pick("apply_edit", lang), variant="primary"),
-                        value=("Применить правку", "Apply edit"),
+                        value=("应用编辑", "편집 적용"),
                     )
                     stop_button = localizer.bind(
-                        gr.Button(pick("stop", lang), variant="stop"), value=("Прервать", "Stop")
+                        gr.Button(pick("stop", lang), variant="stop"), value=("停止", "중지")
                     )
 
             with gr.Row(elem_classes=[layout.SLOT_ACTIONS]):
                 boost_enabled = localizer.bind(
                     gr.Checkbox(label=pick("boost", lang), value=False),
-                    label=("AI буст", "AI boost"),
+                    label=("AI 提示词优化", "AI 프롬프트 최적화"),
                 )
                 describe_button = localizer.bind(
-                    gr.Button(pick("describe", lang)), value=("Описать изображение", "Describe image")
+                    gr.Button(pick("describe", lang)), value=("描述图片", "이미지 설명")
                 )
 
         with gr.Column(min_width=layout.SIDE_MIN_WIDTH, elem_classes=[layout.SIDE_COL]):
@@ -288,13 +288,13 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     value=MASK_MASK,
                     label=pick("mask_mode", lang),
                 ),
-                label=("Режим области", "Region mode"),
+                label=("区域模式", "영역 모드"),
                 # Подписи вариантов — не служебные идентификаторы вроде имён
                 # пресетов, а переводимый текст из T; без этого поля переключатель
                 # языка обновил бы всё вокруг радиокнопок, но не их подписи.
                 choices=(
-                    [(pick(_MODE_KEYS[key], "ru"), key) for key in _MODE_KEYS],
-                    [(pick(_MODE_KEYS[key], "en"), key) for key in _MODE_KEYS],
+                    [(pick(_MODE_KEYS[key], "zh"), key) for key in _MODE_KEYS],
+                    [(pick(_MODE_KEYS[key], "ko"), key) for key in _MODE_KEYS],
                 ),
             )
             quality = localizer.bind(
@@ -303,46 +303,46 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     label=pick("quality", lang), elem_classes=[layout.CHOICES],
                 ),
                 label=T["quality"],
-                choices=(quality_choices.choices("ru"), quality_choices.choices("en")),
+                choices=(quality_choices.choices("zh"), quality_choices.choices("ko")),
             )
             status = localizer.bind(
                 gr.Textbox(
                     label=pick("status", lang), interactive=False, lines=3,
                     elem_classes=[layout.STATUS],
                 ),
-                label=("Состояние", "Status"),
+                label=("状态", "상태"),
             )
 
             advanced = localizer.bind(
                 gr.Accordion(pick("advanced", lang), open=False),
-                label=("Продвинутое", "Advanced"),
+                label=("高级设置", "고급 설정"),
             )
             with advanced:
                 grow = localizer.bind(
                     gr.Slider(0, 64, value=8, step=1, label=pick("mask_grow", lang)),
-                    label=("Запас маски, пикселей", "Mask grow, pixels"),
+                    label=("扩展蒙版（像素）", "마스크 확장(px)"),
                 )
                 feather = localizer.bind(
                     gr.Slider(0, 64, value=12, step=1, label=pick("mask_feather", lang)),
-                    label=("Растушёвка, пикселей", "Feather, pixels"),
+                    label=("羽化（像素）", "페더(px)"),
                 )
                 keep_outside = localizer.bind(
                     gr.Checkbox(
                         value=True, label=pick("keep_outside", lang), info=pick("keep_outside_info", lang)
                     ),
-                    label=("Сохранять кадр вне маски", "Keep pixels outside the mask"),
+                    label=("保留蒙版外区域", "마스크 밖 픽셀 유지"),
                     info=(
-                        "Склеивает результат с оригиналом: вне маски пиксели остаются исходными.",
-                        "Blends the result with the original so pixels outside the mask stay untouched.",
+                        "将结果与原图合成，蒙版之外的像素保持原样。",
+                        "결과를 원본과 합성해 마스크 밖의 픽셀은 원본 그대로 유지합니다.",
                     ),
                 )
                 seed = localizer.bind(
-                    gr.Number(value=-1, precision=0, label=pick("seed", lang)), label=("Сид", "Seed")
+                    gr.Number(value=-1, precision=0, label=pick("seed", lang)), label=("随机种子", "시드")
                 )
 
             outpaint_accordion = localizer.bind(
                 gr.Accordion(pick("outpaint", lang), open=False),
-                label=("Расширить холст", "Outpaint"),
+                label=("扩展画布", "아웃페인팅"),
             )
             with outpaint_accordion:
                 sides = localizer.bind(
@@ -350,14 +350,14 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                         choices=[("←", "left"), ("→", "right"), ("↑", "top"), ("↓", "bottom")],
                         label=pick("outpaint_sides", lang),
                     ),
-                    label=("Стороны", "Sides"),
+                    label=("扩展方向", "확장 방향"),
                 )
                 amount = localizer.bind(
                     gr.Slider(0.1, 1.0, value=0.35, step=0.05, label=pick("outpaint_amount", lang)),
-                    label=("Насколько расширить", "How far to expand"),
+                    label=("扩展距离", "확장 크기"),
                 )
                 expand_button = localizer.bind(
-                    gr.Button(pick("outpaint", lang)), value=("Расширить холст", "Outpaint")
+                    gr.Button(pick("outpaint", lang)), value=("扩展画布", "아웃페인팅")
                 )
 
     # --- обработчики ---

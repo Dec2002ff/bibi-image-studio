@@ -1,0 +1,32 @@
+name: Bibi foundation checks
+
+on:
+  push:
+    branches: [bibi-foundation]
+  pull_request:
+    paths:
+      - "fooocus_qwen/bibi/**"
+      - "fooocus_qwen/ui/**"
+      - "fooocus_qwen/config.py"
+      - "fooocus_qwen/settings.py"
+      - "tests/test_bibi_*.py"
+      - "config/**"
+      - "run.ps1"
+      - ".github/workflows/bibi-foundation.yml"
+
+jobs:
+  product-layer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install lightweight test dependency
+        run: python -m pip install --upgrade pytest
+      - name: Compile product and UI layers
+        run: python -m compileall -q fooocus_qwen/bibi fooocus_qwen/ui fooocus_qwen/config.py fooocus_qwen/settings.py
+      - name: Prepare pytest temp directory
+        run: mkdir -p tmp
+      - name: Test Bibi product contracts
+        run: python -m pytest -q --noconftest tests/test_bibi_profiles.py tests/test_bibi_product_layer.py

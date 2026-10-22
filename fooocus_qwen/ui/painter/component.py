@@ -67,7 +67,7 @@ class MaskPainter(gr.HTML):
         self,
         value: str | None = None,
         *,
-        lang: str = "ru",
+        lang: str = "zh",
         region: str = "mask",
         labels: dict[str, list[str]] | None = None,
         palette: list[str] | None = None,

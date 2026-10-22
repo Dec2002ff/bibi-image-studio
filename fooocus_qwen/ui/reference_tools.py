@@ -68,20 +68,20 @@ SKETCH_COLOURS: tuple[str, ...] = (
 # интерфейсе подсказки оставались русскими (найдено, когда английский стал
 # языком по умолчанию).
 TOOL_TITLES = {
-    layout.REF_POSE: ("Поза: выбрать из библиотеки или по фото", "Pose: pick from the library or from a photo"),
-    layout.REF_SKETCH: ("Эскиз: нарисовать от руки", "Sketch: draw by hand"),
+    layout.REF_POSE: ("姿势：从姿势库选择或上传照片", "포즈: 라이브러리에서 선택하거나 사진 업로드"),
+    layout.REF_SKETCH: ("草图：手绘参考", "스케치: 직접 그리기"),
 }
 TITLES_JS = """
 () => {
     const titles = __TITLES__;
     const button = document.querySelector('.qs-lang');
-    window.__qsToolLang = button ? button.innerText.trim().toLowerCase() : 'en';
+    window.__qsToolLang = button && button.innerText.trim() === '한' ? 'ko' : 'zh';
     const apply = root => {
         for (const [cls, pair] of Object.entries(titles)) {
             const nodes = root.classList && root.classList.contains(cls)
                 ? [root] : (root.querySelectorAll ? root.querySelectorAll('.' + cls) : []);
             nodes.forEach(node => {
-                node.title = pair[window.__qsToolLang === 'en' ? 1 : 0];
+                node.title = pair[window.__qsToolLang === 'ko' ? 1 : 0];
                 node.setAttribute('aria-label', node.title);
             });
         }
@@ -154,7 +154,7 @@ POSE_EDIT_JS = """
     const TIP = __TIP__;
     const langIndex = () => {
         const button = document.querySelector('.qs-lang');
-        return button && button.innerText.trim().toLowerCase() === 'ru' ? 0 : 1;
+        return button && button.innerText.trim() === '한' ? 1 : 0;
     };
     const decorate = () => {
         document.querySelectorAll('.__GRID__').forEach(grid => {
@@ -256,8 +256,8 @@ def build(
             with gr.Column(visible=False) as add_panel:
                 pose_name = localizer.bind(
                     gr.Textbox(label=pick("pose_name", lang), placeholder=pick("pose_name_hint", lang), max_lines=1),
-                    label=("Имя позы", "Pose name"),
-                    placeholder=("необязательно — можно задать и потом", "optional — you can set it later too"),
+                    label=("姿势名称", "포즈 이름"),
+                    placeholder=("可选，也可以之后再命名", "선택 사항이며 나중에 이름을 정할 수 있습니다"),
                 )
                 pose_photo = localizer.bind(
                     gr.Image(
@@ -267,7 +267,7 @@ def build(
                         buttons=[],
                         elem_classes=[layout.POSE_PHOTO],
                     ),
-                    label=("Фото с нужной позой", "A photo with the pose"),
+                    label=("姿势参考照片", "포즈 참고 사진"),
                 )
             # Правка позы: имя и перерисовка обложки.
             editing = gr.State("")
@@ -280,47 +280,47 @@ def build(
                     with gr.Column():
                         edit_name = localizer.bind(
                             gr.Textbox(label=pick("pose_name", lang), max_lines=1),
-                            label=("Имя позы", "Pose name"),
+                            label=("姿势名称", "포즈 이름"),
                         )
                         with gr.Row():
                             save_name = localizer.bind(
                                 gr.Button(pick("pose_save_name", lang), variant="primary"),
-                                value=("Сохранить имя", "Save name"),
+                                value=("保存名称", "이름 저장"),
                             )
                             redraw = localizer.bind(
                                 gr.Button(pick("pose_redraw", lang)),
-                                value=("Перерисовать обложку", "Redraw cover"),
+                                value=("重新生成封面", "커버 다시 생성"),
                             )
                         # Обложка не удалась — показывать вместо неё схему (скелет).
                         edit_schematic = localizer.bind(
                             gr.Checkbox(label=pick("pose_schematic", lang), info=pick("pose_schematic_info", lang)),
-                            label=("Схематичный вид", "Schematic view"),
+                            label=("显示骨架", "스켈레톤 보기"),
                             info=(
-                                "показывать вместо обложки скелет позы — если обложка не удалась",
-                                "show the pose skeleton instead of the cover — when the cover came out wrong",
+                                "封面效果不好时，可以显示姿势骨架。",
+                                "커버가 잘 나오지 않았을 때 포즈 스켈레톤을 표시합니다.",
                             ),
                         )
                         with gr.Row():
                             edit_back = localizer.bind(
-                                gr.Button(pick("pose_back", lang), size="sm"), value=("К позам", "Back to poses")
+                                gr.Button(pick("pose_back", lang), size="sm"), value=("返回姿势库", "포즈 목록으로")
                             )
                             remove = localizer.bind(
                                 gr.Button(pick("pose_delete", lang), size="sm"),
-                                value=("Удалить позу", "Delete pose"),
+                                value=("删除姿势", "포즈 삭제"),
                             )
                         # Удаление — только после подтверждения.
                         with gr.Row(visible=False) as confirm_row:
                             remove_yes = localizer.bind(
                                 gr.Button(pick("pose_delete_yes", lang), variant="stop", size="sm"),
-                                value=("Да, удалить", "Yes, delete"),
+                                value=("确认删除", "삭제 확인"),
                             )
                             remove_no = localizer.bind(
-                                gr.Button(pick("modal_cancel", lang), size="sm"), value=("Отмена", "Cancel")
+                                gr.Button(pick("modal_cancel", lang), size="sm"), value=("取消", "취소")
                             )
             pose_message = gr.Markdown(elem_classes=[layout.MODAL_MESSAGE])
             with gr.Row():
                 pose_close = localizer.bind(
-                    gr.Button(pick("modal_close", lang), size="sm"), value=("Закрыть", "Close")
+                    gr.Button(pick("modal_close", lang), size="sm"), value=("关闭", "닫기")
                 )
 
     # --- окно эскиза ---
@@ -338,15 +338,15 @@ def build(
                     elem_id=sketch_id,
                     elem_classes=[layout.SKETCH],
                 ),
-                lang=("ru", "en"),
+                lang=("zh", "ko"),
             )
             sketch_message = gr.Markdown(elem_classes=[layout.MODAL_MESSAGE])
             with gr.Row():
                 sketch_cancel = localizer.bind(
-                    gr.Button(pick("modal_cancel", lang)), value=("Отмена", "Cancel")
+                    gr.Button(pick("modal_cancel", lang)), value=("取消", "취소")
                 )
                 sketch_accept = localizer.bind(
-                    gr.Button(pick("modal_accept", lang), variant="primary"), value=("Принять", "Accept")
+                    gr.Button(pick("modal_accept", lang), variant="primary"), value=("确认", "확인")
                 )
 
     # --- обработчики: позы ---

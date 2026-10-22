@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "updated": "2026-10-02",
+  "models": [
+    {
+      "id": "qwen-image-2.1",
+      "role": "primary-generation-and-editing",
+      "source": "Qwen/Qwen-Image-2.1",
+      "required": true,
+      "license": "Qwen Research License Agreement",
+      "commercial_use": "requires separate commercial license from Qwen",
+      "install": "managed by existing upstream WeightsPlan/fetch flow"
+    },
+    {
+      "id": "qwen-image-2.1-int8",
+      "role": "low-vram-transformer",
+      "source": "unsloth/Qwen-Image-2.1-FP8",
+      "required": false,
+      "install": "selected by existing upstream WeightsPlan"
+    },
+    {
+      "id": "qwen-image-2.1-gguf",
+      "role": "low-vram-transformer",
+      "source": "unsloth/Qwen-Image-2.1-GGUF",
+      "required": false,
+      "install": "selected by existing upstream WeightsPlan"
+    },
+    {
+      "id": "dwpose",
+      "role": "pose-reference-extraction",
+      "source": "existing upstream fetch flow",
+      "required": false,
+      "install": "downloaded only when pose tools are used/setup"
+    }
+  ],
+  "optional_backends": [
+    {
+      "id": "comfyui",
+      "source": "Comfy-Org/ComfyUI",
+      "integration": "external API only",
+      "bundled": false,
+      "license": "GPL-3.0"
+    }
+  ],
+  "policies": {
+    "commit_model_weights": false,
+    "commit_user_outputs": false,
+    "redistribute_third_party_loras": false
+  }
+}

@@ -155,18 +155,18 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                         preview=True,
                         buttons=layout.GALLERY_BUTTONS,
                     ),
-                    label=("Результат", "Result"),
+                    label=("生成预览", "생성 미리보기"),
                 )
             # Результат — в кисть правки, с переходом на её вкладку. Связывается
             # в app.py: вкладка правки собирается после этой.
             with gr.Row():
                 send_to_edit = localizer.bind(
                     gr.Button(pick("send_to_edit", lang)),
-                    value=("Отправить в редактор", "Send to editor"),
+                    value=("发送到编辑器", "편집기로 보내기"),
                 )
                 send_to_refs = localizer.bind(
                     gr.Button(pick("send_to_references", lang)),
-                    value=("Отправить в референсы", "Send to references"),
+                    value=("作为参考图", "참고 이미지로 보내기"),
                 )
             selected = gr.State(None)
 
@@ -178,34 +178,34 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                         lines=3,
                         scale=8,
                     ),
-                    label=("Промт", "Prompt"),
-                    placeholder=("Опишите изображение…", "Describe the image…"),
+                    label=("提示词", "프롬프트"),
+                    placeholder=("描述你想生成的画面……", "생성하고 싶은 이미지를 설명해 주세요…"),
                 )
                 with gr.Column(scale=1, min_width=140):
                     run_button = localizer.bind(
                         gr.Button(pick("generate", lang), variant="primary"),
-                        value=("Сгенерировать", "Generate"),
+                        value=("✦ 开始生成", "✦ 생성 시작"),
                     )
                     stop_button = localizer.bind(
-                        gr.Button(pick("stop", lang), variant="stop"), value=("Прервать", "Stop")
+                        gr.Button(pick("stop", lang), variant="stop"), value=("停止生成", "생성 중지")
                     )
 
             with gr.Row():
                 boost_enabled = localizer.bind(
                     gr.Checkbox(label=pick("boost", lang), value=False, info=pick("boost_info", lang)),
-                    label=("AI буст", "AI boost"),
+                    label=("AI 提示词优化", "AI 프롬프트 최적화"),
                     info=(
-                        "Переписать промт внешней языковой моделью перед генерацией.",
-                        "Rewrite the prompt with an external language model before generating.",
+                        "生成前使用语言模型优化提示词。",
+                        "생성 전에 언어 모델로 프롬프트를 다듬습니다.",
                     ),
                 )
                 boost_now = localizer.bind(
-                    gr.Button(pick("boost_now", lang)), value=("Переписать сейчас", "Rewrite now")
+                    gr.Button(pick("boost_now", lang)), value=("帮我优化提示词", "프롬프트 최적화")
                 )
 
             boosted = localizer.bind(
                 gr.Textbox(label=pick("boost_result", lang), lines=3, interactive=True),
-                label=("Переписанный промт", "Rewritten prompt"),
+                label=("优化后的提示词", "최적화된 프롬프트"),
             )
 
         with gr.Column(min_width=layout.SIDE_MIN_WIDTH, elem_classes=[layout.SIDE_COL]):
@@ -219,7 +219,7 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     elem_classes=[layout.CHOICES],
                 ),
                 label=T["quality"],
-                choices=(quality_choices.choices("ru"), quality_choices.choices("en")),
+                choices=(quality_choices.choices("zh"), quality_choices.choices("ko")),
             )
             ratio = localizer.bind(
                 gr.Dropdown(
@@ -227,28 +227,28 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     value="1:1",
                     label=pick("aspect", lang),
                 ),
-                label=("Соотношение сторон", "Aspect ratio"),
+                label=("画面比例", "화면 비율"),
                 # Подписи вариантов — переводимый текст, а не служебные
                 # идентификаторы (см. докстринг _ratio_choices), поэтому, как и
                 # у mask_mode на вкладке редактирования, переводится и label, и
                 # choices.
-                choices=(_ratio_choices("ru"), _ratio_choices("en")),
+                choices=(_ratio_choices("zh"), _ratio_choices("ko")),
             )
             image_number = localizer.bind(
                 gr.Slider(1, 8, value=1, step=1, label=pick("image_number", lang)),
-                label=("Количество изображений", "Image number"),
+                label=("生成数量", "생성 수량"),
             )
             status = localizer.bind(
                 gr.Textbox(
                     label=pick("status", lang), interactive=False, lines=3,
                     elem_classes=[layout.STATUS],
                 ),
-                label=("Состояние", "Status"),
+                label=("状态", "상태"),
             )
 
             advanced = localizer.bind(
                 gr.Accordion(pick("advanced", lang), open=False),
-                label=("Продвинутое", "Advanced"),
+                label=("高级设置", "고급 설정"),
             )
             with advanced:
                 styles = localizer.bind(
@@ -258,29 +258,27 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                         multiselect=True,
                         label=pick("styles", lang),
                     ),
-                    label=("Стили", "Styles"),
+                    label=("风格", "스타일"),
                 )
                 negative = localizer.bind(
                     gr.Textbox(label=pick("negative", lang), lines=2),
-                    label=("Негативный промт", "Negative prompt"),
+                    label=("反向提示词", "네거티브 프롬프트"),
                 )
                 cfg = localizer.bind(
                     gr.Slider(
                         1.0, 8.0, value=1.0, step=0.1,
                         label=pick("cfg", lang), info=pick("cfg_info", lang),
                     ),
-                    label=("Сила guidance (true_cfg_scale)", "Guidance strength (true_cfg_scale)"),
+                    label=("Guidance 强度 (true_cfg_scale)", "Guidance 강도 (true_cfg_scale)"),
                     info=(
-                        "Модель рассчитана на работу без guidance. При значении 1.0 негативный "
-                        "промт и негативные части стилей в модель не попадают вовсе.",
-                        "The model is meant to be sampled without guidance. At 1.0 the negative "
-                        "prompt and the negative half of every style are not sent to the model at all.",
+                        "模型默认按无 guidance 方式采样。设为 1.0 时，反向提示词和风格中的负向部分不会送入模型。",
+                        "모델은 기본적으로 guidance 없이 샘플링하도록 설계되었습니다. 1.0에서는 네거티브 프롬프트와 스타일의 네거티브 부분을 모델에 전달하지 않습니다.",
                     ),
                 )
                 seed = localizer.bind(
                     gr.Number(value=-1, precision=0, label=pick("seed", lang), info=pick("seed_info", lang)),
-                    label=("Сид", "Seed"),
-                    info=("−1 — выбрать случайно", "−1 picks a random one"),
+                    label=("随机种子", "시드"),
+                    info=("−1 表示随机", "−1은 무작위"),
                 )
                 # Выпадающий список, а не ползунок: осмысленных значений
                 # немного, они привязаны к измеренным режимам
@@ -295,46 +293,40 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                         label=pick("reference_scale", lang),
                         info=pick("reference_scale_info", lang),
                     ),
-                    label=("Детальность референсов", "Reference detail"),
+                    label=("参考图细节", "참고 이미지 디테일"),
                     info=(
-                        "Разрешение, к которому приводятся референсы и исходник правки. "
-                        "Размер кадра от этого не меняется. «Авто» урезает масштаб при "
-                        "двух и более референсах: на полном пять референсов считаются "
-                        "тринадцать минут, на 512 — сорок секунд.",
-                        "The resolution condition images are scaled to. It does not change "
-                        "the frame size. “Auto” reduces the scale from two "
-                        "references up: at full scale five references take thirteen minutes "
-                        "per frame, at 512 — forty seconds.",
+                        "控制参考图和编辑原图送入模型时的细节分辨率，不会改变最终画面尺寸。多张参考图时建议使用“自动”或 512 以节省显存和时间。",
+                        "참고 이미지와 편집 원본이 모델에 들어갈 때의 디테일 해상도입니다. 최종 이미지 크기는 바뀌지 않습니다. 참고 이미지가 여러 장이면 ‘자동’ 또는 512를 권장합니다.",
                     ),
                 )
                 kv_cache = localizer.bind(
                     gr.Checkbox(
                         value=True, label=pick("kv_cache", lang), info=pick("kv_cache_info", lang)
                     ),
-                    label=("Кэш ключей и значений", "KV cache"),
+                    label=("KV 缓存", "KV 캐시"),
                     info=(
-                        "Ускоряет генерацию. Переключение меняет результат при том же сиде.",
-                        "Speeds generation up. Toggling it changes the result for the same seed.",
+                        "可加速生成；即使 Seed 相同，开关状态不同也可能得到不同结果。",
+                        "생성을 빠르게 할 수 있습니다. 같은 Seed라도 설정이 다르면 결과가 달라질 수 있습니다.",
                     ),
                 )
 
                 preset_name = localizer.bind(
                     gr.Textbox(label=pick("preset_name", lang)),
-                    label=("Имя для сохранения", "Name to save as"),
+                    label=("保存名称", "저장 이름"),
                 )
                 saved = localizer.bind(
                     gr.Dropdown(
                         choices=library.list_prompts(config.PROMPT_DIR),
                         label=pick("load_prompt", lang),
                     ),
-                    label=("Сохранённые промты", "Saved prompts"),
+                    label=("已保存提示词", "저장된 프롬프트"),
                 )
                 with gr.Row():
                     save_button = localizer.bind(
-                        gr.Button(pick("save_prompt", lang)), value=("Сохранить промт", "Save prompt")
+                        gr.Button(pick("save_prompt", lang)), value=("保存提示词", "프롬프트 저장")
                     )
                     delete_button = localizer.bind(
-                        gr.Button(pick("delete_prompt", lang)), value=("Удалить промт", "Delete prompt")
+                        gr.Button(pick("delete_prompt", lang)), value=("删除提示词", "프롬프트 삭제")
                     )
 
     # --- обработчики ---

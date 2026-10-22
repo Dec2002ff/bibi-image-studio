@@ -20,7 +20,7 @@
     .\run.ps1
 
 .EXAMPLE
-    .\run.ps1 --lang ru --port 7870
+    .\run.ps1 --lang zh --port 7870
 #>
 
 [CmdletBinding()]

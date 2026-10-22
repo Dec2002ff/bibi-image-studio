@@ -45,26 +45,30 @@ def precision_choices(lang: str, vram_gib: float | None) -> list[tuple[str, str]
     ]
 
 
-# Профиль: (для каких карт, как раскладываются веса) — (ru, en).
+# VRAM profiles shown in the product languages.
 _PROFILE_CARDS = {
-    settings_module.MEMORY_HIGH: ("Для карт от 20 ГБ", "For 20 GB cards and up"),
-    settings_module.MEMORY_LOW: ("Для карт 6–16 ГБ", "For 6–16 GB cards"),
+    settings_module.MEMORY_HIGH: ("20GB 以上显存", "20GB 이상 VRAM"),
+    settings_module.MEMORY_LOW: ("6–16GB 显存", "6–16GB VRAM"),
 }
 _PROFILE_HOW = {
-    settings_module.MEMORY_HIGH: ("модели по очереди целиком на карте", "models take turns on the card whole"),
+    settings_module.MEMORY_HIGH: ("模型依次完整放入显卡", "모델을 번갈아 GPU에 전체 로드"),
     settings_module.MEMORY_LOW: (
-        "модель на карте, энкодер по слоям, кэш в ОЗУ",
-        "model on the card, encoder layer by layer, cache in RAM",
+        "主模型驻留显卡，编码器分层加载，缓存放在内存",
+        "주 모델은 GPU에 유지하고 인코더는 레이어별 로드, 캐시는 RAM 사용",
     ),
 }
 
 
 def profile_choices(lang: str, vram_gib: float | None) -> list[tuple[str, str]]:
-    """Профили памяти словами; у «Авто» — во что он превратится на этой карте."""
-    index = 0 if lang == "ru" else 1
-    cards = _PROFILE_CARDS[settings_module.resolve_profile(settings_module.MEMORY_AUTO, vram_gib)][index]
-    resolved = cards[0].lower() + cards[1:]
-    auto = f"Авто — по видеокарте (сейчас: {resolved})" if lang == "ru" else f"Auto — by the video card (now: {resolved})"
+    """VRAM profiles with a resolved Auto label for the current GPU."""
+    index = 0 if lang == "zh" else 1
+    resolved_name = settings_module.resolve_profile(settings_module.MEMORY_AUTO, vram_gib)
+    cards = _PROFILE_CARDS[resolved_name][index]
+    auto = (
+        f"自动 — 根据显卡选择（当前：{cards}）"
+        if lang == "zh"
+        else f"자동 — GPU에 맞게 선택 (현재: {cards})"
+    )
     return [(auto, settings_module.MEMORY_AUTO)] + [
         (f"{_PROFILE_CARDS[name][index]} — {_PROFILE_HOW[name][index]}", name)
         for name in (settings_module.MEMORY_HIGH, settings_module.MEMORY_LOW)
@@ -146,8 +150,8 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     placeholder=pick("llm_address_placeholder", lang),
                     value=current.base_url if current else "",
                 ),
-                label=("Адрес сервера языковой модели", "Language model server address"),
-                placeholder=("192.168.1.10:8000 или https://…", "192.168.1.10:8000 or https://…"),
+                label=("语言模型服务器地址", "언어 모델 서버 주소"),
+                placeholder=("192.168.1.10:8000 或 https://…", "192.168.1.10:8000 또는 https://…"),
             )
             # Поле пароля и всегда пустое: сервер токен не показывает — ни
             # здесь, ни где-либо ещё в интерфейсе.
@@ -158,42 +162,42 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     type="password",
                     value="",
                 ),
-                label=("Токен", "Token"),
-                placeholder=("Пусто — оставить прежний", "Empty keeps the current one"),
+                label=("Token", "토큰"),
+                placeholder=("留空则保留当前 Token", "비워 두면 현재 토큰 유지"),
             )
             with gr.Row():
                 save_endpoint = localizer.bind(
-                    gr.Button(pick("save", lang)), value=("Сохранить", "Save")
+                    gr.Button(pick("save", lang)), value=("保存", "저장")
                 )
                 check = localizer.bind(
                     gr.Button(pick("llm_check", lang), variant="primary"),
-                    value=("Проверить связь", "Check connection"),
+                    value=("检查连接", "연결 확인"),
                 )
             forget = localizer.bind(
                 gr.Button(pick("llm_forget_token", lang), size="sm"),
-                value=("Убрать токен", "Remove the token"),
+                value=("移除 Token", "토큰 제거"),
             )
             endpoint_status = localizer.bind(
                 gr.Textbox(
                     label=pick("status", lang), interactive=False, lines=2,
                     value=describe_endpoint(lang),
                 ),
-                label=("Состояние", "Status"),
+                label=("状态", "상태"),
             )
 
         # Системный промт — единственное место вкладки, где ширина идёт в
         # дело: это абзацы текста, который правят руками.
         with gr.Column(min_width=layout.SIDE_MIN_WIDTH, elem_classes=[layout.TEXT_COL]):
-            ru_choices = [(pick(_PROMPT_KEYS[name], "ru"), name) for name in _PROMPT_FILES]
-            en_choices = [(pick(_PROMPT_KEYS[name], "en"), name) for name in _PROMPT_FILES]
+            zh_choices = [(pick(_PROMPT_KEYS[name], "zh"), name) for name in _PROMPT_FILES]
+            ko_choices = [(pick(_PROMPT_KEYS[name], "ko"), name) for name in _PROMPT_FILES]
             chosen_file = localizer.bind(
                 gr.Dropdown(
-                    choices=ru_choices if lang == "ru" else en_choices,
+                    choices=zh_choices if lang == "zh" else ko_choices,
                     value=_PROMPT_FILES[0],
                     label=pick("sysprompt_select", lang),
                 ),
-                label=("Системный промт", "System prompt"),
-                choices=(ru_choices, en_choices),
+                label=("系统提示词", "시스템 프롬프트"),
+                choices=(zh_choices, ko_choices),
             )
             prompt_text = gr.Textbox(
                 lines=18,
@@ -202,11 +206,11 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                 elem_classes=[layout.LONG_TEXT],
             )
             save_prompt_button = localizer.bind(
-                gr.Button(pick("save_prompt", lang)), value=("Сохранить промт", "Save prompt")
+                gr.Button(pick("save_prompt", lang)), value=("保存提示词", "프롬프트 저장")
             )
             prompt_status = localizer.bind(
                 gr.Textbox(label=pick("status", lang), interactive=False, lines=2),
-                label=("Состояние", "Status"),
+                label=("状态", "상태"),
             )
 
         # Память стояла отдельной строкой под обеими колонками и занимала
@@ -229,13 +233,14 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     label=pick("perf_precision", lang),
                     info=pick("perf_precision_info", lang),
                     elem_classes=[layout.CHOICES],
+                    interactive=True,
                 ),
                 label=T["perf_precision"],
                 info=T["perf_precision_info"],
-                choices=(precision_choices("ru", vram), precision_choices("en", vram)),
+                choices=(precision_choices("zh", vram), precision_choices("ko", vram)),
             )
             apply_precision_button = localizer.bind(
-                gr.Button(pick("perf_apply", lang)), value=("Применить точность", "Apply precision")
+                gr.Button(pick("perf_apply", lang)), value=("应用精度", "정밀도 적용")
             )
             # Профиль памяти — раскладка весов (settings.MEMORY_PROFILES). Как
             # и точность, меняется перезагрузкой модели, поэтому — кнопкой.
@@ -245,12 +250,13 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     value=chosen.memory_profile,
                     label=pick("perf_profile", lang),
                     elem_classes=[layout.CHOICES],
+                    interactive=True,
                 ),
                 label=T["perf_profile"],
-                choices=(profile_choices("ru", vram), profile_choices("en", vram)),
+                choices=(profile_choices("zh", vram), profile_choices("ko", vram)),
             )
             apply_profile_button = localizer.bind(
-                gr.Button(pick("perf_profile_apply", lang)), value=("Применить профиль", "Apply profile")
+                gr.Button(pick("perf_profile_apply", lang)), value=("应用显存模式", "VRAM 프로필 적용")
             )
             sage = localizer.bind(
                 gr.Checkbox(
@@ -259,14 +265,14 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     # Без пакета галочка ничего бы не включила — и не обещает.
                     interactive=attention.sage_available(),
                 ),
-                label=("SageAttention — быстрое внимание", "SageAttention — fast attention"),
+                label=("SageAttention — 加速注意力", "SageAttention — 빠른 어텐션"),
             )
             performance_status = localizer.bind(
                 gr.Textbox(
                     label=pick("status", lang), interactive=False, lines=2,
                     value=describe_performance(studio, lang),
                 ),
-                label=("Состояние", "Status"),
+                label=("状态", "상태"),
             )
 
             memory = localizer.bind(
@@ -276,7 +282,7 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                     lines=2,
                     value=say("model_not_loaded", lang),
                 ),
-                label=("Память видеокарты", "GPU memory"),
+                label=("显存", "GPU 메모리"),
                 # Значение поля тоже переводимо: это заглушка «ещё не
                 # загружена», а не результат измерения. Переключение языка
                 # сбрасывает поле к ней — для снимка, который обновляют
@@ -285,7 +291,7 @@ def build(studio, localizer: Localizer, language=None) -> dict:
                 value=MESSAGES["model_not_loaded"],
             )
             memory_refresh = localizer.bind(
-                gr.Button(pick("refresh", lang)), value=("Обновить", "Refresh")
+                gr.Button(pick("refresh", lang)), value=("刷新", "새로고침")
             )
 
     def store_endpoint(address_text, token_text, lang):
